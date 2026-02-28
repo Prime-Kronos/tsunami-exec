@@ -1,0 +1,1227 @@
+--[[
+    ██████████████████████████████████████████
+    ██  TSUNAMI EXECUTOR v3.7               ██
+    ██  Escape the Tsunami for Brainrot     ██
+    ██  Mobile-Optimized | Ultra God Mode   ██
+    ██████████████████████████████████████████
+
+    Вставь в любой Executor (Fluxus, Delta и тд)
+    Работает на телефоне — большие кнопки!
+]]
+
+-- ══════════════════════════════════════════
+--  SERVICES
+-- ══════════════════════════════════════════
+local Players         = game:GetService("Players")
+local RunService      = game:GetService("RunService")
+local UserInputService= game:GetService("UserInputService")
+local TweenService    = game:GetService("TweenService")
+local HttpService     = game:GetService("HttpService")
+
+local lp   = Players.LocalPlayer
+local pg   = lp.PlayerGui
+local cam  = workspace.CurrentCamera
+
+-- ══════════════════════════════════════════
+--  HELPERS
+-- ══════════════════════════════════════════
+local function getChar()  return lp.Character end
+local function getHum()   local c=getChar(); return c and c:FindFirstChildOfClass("Humanoid") end
+local function getRoot()  local c=getChar(); return c and c:FindFirstChild("HumanoidRootPart") end
+
+local function tween(obj, props, t, style, dir)
+    TweenService:Create(obj,
+        TweenInfo.new(t or 0.2, style or Enum.EasingStyle.Quad, dir or Enum.EasingDirection.Out),
+        props):Play()
+end
+
+-- ══════════════════════════════════════════
+--  COLOURS / THEME
+-- ══════════════════════════════════════════
+local C = {
+    BG       = Color3.fromRGB(5,  10,  20),
+    PANEL    = Color3.fromRGB(8,  15,  30),
+    PANEL2   = Color3.fromRGB(10, 18,  36),
+    WAVE     = Color3.fromRGB(0,  212, 255),
+    NEON     = Color3.fromRGB(0,  255, 170),
+    DANGER   = Color3.fromRGB(255, 60,  60),
+    GOLD     = Color3.fromRGB(255, 180,  0),
+    GOLD2    = Color3.fromRGB(255, 220, 80),
+    TEXT     = Color3.fromRGB(200, 235, 255),
+    SUBTEXT  = Color3.fromRGB(100, 160, 200),
+    BORDER   = Color3.fromRGB(0,   80, 120),
+    OFF      = Color3.fromRGB(30,  40,  55),
+    WHITE    = Color3.fromRGB(255, 255, 255),
+}
+
+-- ══════════════════════════════════════════
+--  STATE
+-- ══════════════════════════════════════════
+local State = {
+    -- Speed & Movement
+    SpeedHack   = false,  SpeedMult = 3,
+    NoClip      = false,
+    AutoJump    = false,
+    FlyMode     = false,  FlyHeight = 0,
+    -- ESP
+    PlayerESP   = false,  EspTags = {},
+    ItemESP     = false,
+    TsuTracker  = true,
+    -- Survival
+    InfStamina  = false,
+    AntiSlip    = false,
+    JumpMult    = 1.5,
+    -- Brainrot
+    AutoWin     = false,
+    TrollMode   = false,
+    AutoCollect = false,
+    FlingHack   = false,
+    -- God Layers
+    HealthLock  = false,
+    InstRespawn = false,
+    Invuln      = false,
+    WaterImm    = false,
+    AntiGrav    = false,
+    AutoTele    = false,
+    -- UI
+    Minimized   = false,
+    ActiveTab   = "SPEED",
+    -- Stats
+    KillsBlocked = 0,
+    Respawns     = 0,
+}
+
+-- ══════════════════════════════════════════
+--  GUI ROOT
+-- ══════════════════════════════════════════
+-- Remove old GUI if re-running
+if pg:FindFirstChild("TsunamiExec") then
+    pg:FindFirstChild("TsunamiExec"):Destroy()
+end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name           = "TsunamiExec"
+ScreenGui.ResetOnSpawn   = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.IgnoreGuiInset = true
+ScreenGui.Parent         = pg
+
+-- ══════════════════════════════════════════
+--  MAIN WINDOW  (fits phone screen well)
+-- ══════════════════════════════════════════
+local WIN_W, WIN_H = 340, 520
+local WIN_X, WIN_Y = 20, 60   -- top-left start pos
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Name            = "MainFrame"
+MainFrame.Size            = UDim2.new(0, WIN_W, 0, WIN_H)
+MainFrame.Position        = UDim2.new(0, WIN_X, 0, WIN_Y)
+MainFrame.BackgroundColor3= C.BG
+MainFrame.BorderSizePixel = 0
+MainFrame.ClipsDescendants= true
+MainFrame.Parent          = ScreenGui
+
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 10)
+MainCorner.Parent = MainFrame
+
+-- Outer glow stroke
+local MainStroke = Instance.new("UIStroke")
+MainStroke.Color     = C.WAVE
+MainStroke.Thickness = 1.5
+MainStroke.Transparency = 0.4
+MainStroke.Parent = MainFrame
+
+-- Top accent bar
+local AccentBar = Instance.new("Frame")
+AccentBar.Size              = UDim2.new(1, 0, 0, 2)
+AccentBar.Position          = UDim2.new(0,0,0,0)
+AccentBar.BackgroundColor3  = C.WAVE
+AccentBar.BorderSizePixel   = 0
+AccentBar.Parent            = MainFrame
+Instance.new("UIGradient", AccentBar).Color =
+    ColorSequence.new{
+        ColorSequenceKeypoint.new(0,   Color3.new(0,0,0)),
+        ColorSequenceKeypoint.new(0.3, C.WAVE),
+        ColorSequenceKeypoint.new(0.7, C.NEON),
+        ColorSequenceKeypoint.new(1,   Color3.new(0,0,0)),
+    }
+
+-- ══════════════════════════════════════════
+--  TITLE BAR
+-- ══════════════════════════════════════════
+local TitleBar = Instance.new("Frame")
+TitleBar.Size             = UDim2.new(1, 0, 0, 46)
+TitleBar.Position         = UDim2.new(0, 0, 0, 2)
+TitleBar.BackgroundColor3 = C.PANEL
+TitleBar.BorderSizePixel  = 0
+TitleBar.Parent           = MainFrame
+
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Size            = UDim2.new(1, -100, 1, 0)
+TitleLabel.Position        = UDim2.new(0, 14, 0, 0)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Font            = Enum.Font.GothamBold
+TitleLabel.Text            = "🌊 TSUNAMI EXECUTOR"
+TitleLabel.TextColor3      = C.WAVE
+TitleLabel.TextSize        = 15
+TitleLabel.TextXAlignment  = Enum.TextXAlignment.Left
+TitleLabel.Parent          = TitleBar
+
+local SubLabel = Instance.new("TextLabel")
+SubLabel.Size   = UDim2.new(1, -14, 0, 14)
+SubLabel.Position = UDim2.new(0, 14, 1, -16)
+SubLabel.BackgroundTransparency = 1
+SubLabel.Font   = Enum.Font.Gotham
+SubLabel.Text   = "BRAINROT EDITION  •  v3.7"
+SubLabel.TextColor3 = C.SUBTEXT
+SubLabel.TextSize   = 10
+SubLabel.TextXAlignment = Enum.TextXAlignment.Left
+SubLabel.Parent = TitleBar
+
+-- Minimize button
+local MinBtn = Instance.new("TextButton")
+MinBtn.Size   = UDim2.new(0, 38, 0, 30)
+MinBtn.Position = UDim2.new(1, -84, 0.5, -15)
+MinBtn.BackgroundColor3 = Color3.fromRGB(20, 30, 50)
+MinBtn.BorderSizePixel = 0
+MinBtn.Text   = "—"
+MinBtn.TextColor3 = C.SUBTEXT
+MinBtn.TextSize = 16
+MinBtn.Font   = Enum.Font.GothamBold
+MinBtn.Parent = TitleBar
+Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(0,6)
+
+-- Close button
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size   = UDim2.new(0, 34, 0, 30)
+CloseBtn.Position = UDim2.new(1, -44, 0.5, -15)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(60, 20, 20)
+CloseBtn.BorderSizePixel = 0
+CloseBtn.Text   = "✕"
+CloseBtn.TextColor3 = C.DANGER
+CloseBtn.TextSize = 14
+CloseBtn.Font   = Enum.Font.GothamBold
+CloseBtn.Parent = TitleBar
+Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0,6)
+
+-- ══════════════════════════════════════════
+--  STATUS ROW
+-- ══════════════════════════════════════════
+local StatusRow = Instance.new("Frame")
+StatusRow.Size             = UDim2.new(1, -16, 0, 28)
+StatusRow.Position         = UDim2.new(0, 8, 0, 52)
+StatusRow.BackgroundTransparency = 1
+StatusRow.Parent           = MainFrame
+
+local function makeStatusPill(txt, color, pos)
+    local f = Instance.new("Frame")
+    f.Size = UDim2.new(0, 95, 1, 0)
+    f.Position = UDim2.new(0, pos, 0, 0)
+    f.BackgroundColor3 = C.PANEL
+    f.BorderSizePixel  = 0
+    f.Parent = StatusRow
+    Instance.new("UICorner", f).CornerRadius = UDim.new(1, 0)
+    local stroke = Instance.new("UIStroke", f)
+    stroke.Color = color; stroke.Thickness = 1; stroke.Transparency = 0.5
+
+    local dot = Instance.new("Frame")
+    dot.Size = UDim2.new(0, 7, 0, 7)
+    dot.Position = UDim2.new(0, 8, 0.5, -3)
+    dot.BackgroundColor3 = color
+    dot.BorderSizePixel = 0
+    dot.Parent = f
+    Instance.new("UICorner", dot).CornerRadius = UDim.new(1,0)
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Size  = UDim2.new(1, -22, 1, 0)
+    lbl.Position = UDim2.new(0, 20, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Font  = Enum.Font.Gotham
+    lbl.Text  = txt
+    lbl.TextColor3 = color
+    lbl.TextSize = 9
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent = f
+    return f, lbl, dot
+end
+
+local _, injectLbl = makeStatusPill("INJECTED",  C.NEON,   0)
+local _, gameLbl   = makeStatusPill("DETECTED",  C.WAVE,   99)
+local _, tsuLbl, tsuDot = makeStatusPill("TSU: FAR", C.NEON, 198)
+
+-- ══════════════════════════════════════════
+--  TAB BAR
+-- ══════════════════════════════════════════
+local TABS = {"SPEED", "ESP", "SURVIVE", "BRAINROT", "☠️GOD"}
+local tabColors = {
+    SPEED    = C.WAVE,
+    ESP      = C.NEON,
+    SURVIVE  = Color3.fromRGB(100, 200, 255),
+    BRAINROT = Color3.fromRGB(200, 100, 255),
+    ["☠️GOD"]  = C.GOLD,
+}
+
+local TabBar = Instance.new("Frame")
+TabBar.Size             = UDim2.new(1, 0, 0, 40)
+TabBar.Position         = UDim2.new(0, 0, 0, 84)
+TabBar.BackgroundColor3 = C.PANEL
+TabBar.BorderSizePixel  = 0
+TabBar.Parent           = MainFrame
+
+local TabButtons = {}
+local function makeTab(name, idx)
+    local totalTabs = #TABS
+    local tabW = 1 / totalTabs
+    local btn = Instance.new("TextButton")
+    btn.Size     = UDim2.new(tabW, -2, 1, -8)
+    btn.Position = UDim2.new(tabW * (idx-1), 1, 0, 4)
+    btn.BackgroundColor3 = C.PANEL2
+    btn.BorderSizePixel = 0
+    btn.Text     = name
+    btn.TextColor3 = C.SUBTEXT
+    btn.TextSize = 10
+    btn.Font     = Enum.Font.GothamBold
+    btn.ClipsDescendants = true
+    btn.Parent   = TabBar
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    TabButtons[name] = btn
+    return btn
+end
+
+for i, t in ipairs(TABS) do makeTab(t, i) end
+
+-- Tab indicator underline
+local TabLine = Instance.new("Frame")
+TabLine.Size             = UDim2.new(0, 40, 0, 2)
+TabLine.Position         = UDim2.new(0, 0, 1, -2)
+TabLine.BackgroundColor3 = C.WAVE
+TabLine.BorderSizePixel  = 0
+TabLine.Parent           = TabBar
+
+-- ══════════════════════════════════════════
+--  SCROLL CONTENT AREA
+-- ══════════════════════════════════════════
+local ContentScroll = Instance.new("ScrollingFrame")
+ContentScroll.Size             = UDim2.new(1, 0, 1, -130)
+ContentScroll.Position         = UDim2.new(0, 0, 0, 128)
+ContentScroll.BackgroundTransparency = 1
+ContentScroll.BorderSizePixel  = 0
+ContentScroll.ScrollBarThickness = 3
+ContentScroll.ScrollBarImageColor3 = C.WAVE
+ContentScroll.CanvasSize       = UDim2.new(0, 0, 0, 0)
+ContentScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+ContentScroll.ScrollingDirection = Enum.ScrollingDirection.Y
+ContentScroll.Parent           = MainFrame
+
+local ContentPad = Instance.new("UIPadding", ContentScroll)
+ContentPad.PaddingLeft  = UDim.new(0,8)
+ContentPad.PaddingRight = UDim.new(0,8)
+ContentPad.PaddingTop   = UDim.new(0,6)
+ContentPad.PaddingBottom= UDim.new(0,10)
+
+local ContentLayout = Instance.new("UIListLayout", ContentScroll)
+ContentLayout.SortOrder    = Enum.SortOrder.LayoutOrder
+ContentLayout.Padding      = UDim.new(0, 6)
+ContentLayout.FillDirection = Enum.FillDirection.Vertical
+
+-- ══════════════════════════════════════════
+--  PANEL HELPERS
+-- ══════════════════════════════════════════
+
+-- Panel container
+local function makePanel(title, icon, order, accentColor)
+    local p = Instance.new("Frame")
+    p.Name             = title
+    p.Size             = UDim2.new(1, 0, 0, 0)
+    p.AutomaticSize    = Enum.AutomaticSize.Y
+    p.BackgroundColor3 = C.PANEL
+    p.BorderSizePixel  = 0
+    p.LayoutOrder      = order
+    p.Parent           = ContentScroll
+    Instance.new("UICorner", p).CornerRadius = UDim.new(0,8)
+
+    local stroke = Instance.new("UIStroke", p)
+    stroke.Color = accentColor or C.BORDER
+    stroke.Thickness = 1; stroke.Transparency = 0.6
+
+    -- top accent line
+    local topLine = Instance.new("Frame", p)
+    topLine.Size = UDim2.new(1,0,0,2)
+    topLine.BackgroundColor3 = accentColor or C.WAVE
+    topLine.BorderSizePixel = 0
+    Instance.new("UICorner", topLine).CornerRadius = UDim.new(0,8)
+
+    local hdr = Instance.new("TextLabel", p)
+    hdr.Size = UDim2.new(1,-10, 0, 30)
+    hdr.Position = UDim2.new(0,10,0,2)
+    hdr.BackgroundTransparency = 1
+    hdr.Font = Enum.Font.GothamBold
+    hdr.Text = (icon or "") .. "  " .. title
+    hdr.TextColor3 = accentColor or C.WAVE
+    hdr.TextSize = 11
+    hdr.TextXAlignment = Enum.TextXAlignment.Left
+
+    local inner = Instance.new("Frame", p)
+    inner.Name = "Inner"
+    inner.Size = UDim2.new(1,-16,0,0)
+    inner.Position = UDim2.new(0,8,0,34)
+    inner.AutomaticSize = Enum.AutomaticSize.Y
+    inner.BackgroundTransparency = 1
+    inner.BorderSizePixel = 0
+    local il = Instance.new("UIListLayout", inner)
+    il.SortOrder = Enum.SortOrder.LayoutOrder
+    il.Padding   = UDim.new(0,4)
+    local bp = Instance.new("UIPadding", inner)
+    bp.PaddingBottom = UDim.new(0,10)
+
+    return p, inner
+end
+
+-- Big toggle row (mobile-friendly 48px height)
+local function makeToggle(parent, labelText, desc, order, onToggle)
+    local row = Instance.new("Frame")
+    row.Size             = UDim2.new(1,0,0,50)
+    row.BackgroundColor3 = C.PANEL2
+    row.BorderSizePixel  = 0
+    row.LayoutOrder      = order
+    row.Parent           = parent
+    Instance.new("UICorner", row).CornerRadius = UDim.new(0,7)
+
+    local nameL = Instance.new("TextLabel", row)
+    nameL.Size  = UDim2.new(1,-70,0,24)
+    nameL.Position = UDim2.new(0,12,0,6)
+    nameL.BackgroundTransparency = 1
+    nameL.Font  = Enum.Font.GothamBold
+    nameL.Text  = labelText
+    nameL.TextColor3 = C.TEXT
+    nameL.TextSize = 13
+    nameL.TextXAlignment = Enum.TextXAlignment.Left
+
+    if desc then
+        local descL = Instance.new("TextLabel", row)
+        descL.Size  = UDim2.new(1,-70,0,16)
+        descL.Position = UDim2.new(0,12,0,28)
+        descL.BackgroundTransparency = 1
+        descL.Font  = Enum.Font.Gotham
+        descL.Text  = desc
+        descL.TextColor3 = C.SUBTEXT
+        descL.TextSize = 10
+        descL.TextXAlignment = Enum.TextXAlignment.Left
+    end
+
+    -- Toggle switch
+    local togBg = Instance.new("Frame", row)
+    togBg.Size     = UDim2.new(0,52,0,28)
+    togBg.Position = UDim2.new(1,-62,0.5,-14)
+    togBg.BackgroundColor3 = C.OFF
+    togBg.BorderSizePixel = 0
+    Instance.new("UICorner", togBg).CornerRadius = UDim.new(1,0)
+
+    local togKnob = Instance.new("Frame", togBg)
+    togKnob.Size     = UDim2.new(0,22,0,22)
+    togKnob.Position = UDim2.new(0,3,0,3)
+    togKnob.BackgroundColor3 = Color3.fromRGB(120,140,160)
+    togKnob.BorderSizePixel = 0
+    Instance.new("UICorner", togKnob).CornerRadius = UDim.new(1,0)
+
+    local isOn = false
+    local function setOn(v)
+        isOn = v
+        tween(togBg, {BackgroundColor3 = v and C.NEON or C.OFF}, 0.18)
+        tween(togKnob, {
+            Position = v and UDim2.new(0,27,0,3) or UDim2.new(0,3,0,3),
+            BackgroundColor3 = v and C.WHITE or Color3.fromRGB(120,140,160)
+        }, 0.18)
+        if v then
+            tween(togBg, {BackgroundColor3 = C.NEON}, 0.18)
+        end
+    end
+
+    local clickBtn = Instance.new("TextButton", row)
+    clickBtn.Size = UDim2.new(1,0,1,0)
+    clickBtn.BackgroundTransparency = 1
+    clickBtn.Text = ""
+    clickBtn.MouseButton1Click:Connect(function()
+        isOn = not isOn
+        setOn(isOn)
+        if onToggle then onToggle(isOn) end
+        -- ripple
+        tween(row, {BackgroundColor3 = Color3.fromRGB(15,22,40)}, 0.1)
+        task.delay(0.1, function() tween(row, {BackgroundColor3 = C.PANEL2}, 0.15) end)
+    end)
+
+    return row, setOn
+end
+
+-- Slider row
+local function makeSlider(parent, labelText, minV, maxV, defaultV, order, onChange)
+    local row = Instance.new("Frame")
+    row.Size             = UDim2.new(1,0,0,54)
+    row.BackgroundColor3 = C.PANEL2
+    row.BorderSizePixel  = 0
+    row.LayoutOrder      = order
+    row.Parent           = parent
+    Instance.new("UICorner", row).CornerRadius = UDim.new(0,7)
+
+    local topRow = Instance.new("Frame", row)
+    topRow.Size = UDim2.new(1,-16,0,20)
+    topRow.Position = UDim2.new(0,8,0,7)
+    topRow.BackgroundTransparency = 1
+
+    local lbl = Instance.new("TextLabel", topRow)
+    lbl.Size = UDim2.new(0.6,0,1,0)
+    lbl.BackgroundTransparency = 1
+    lbl.Font = Enum.Font.Gotham
+    lbl.Text = labelText
+    lbl.TextColor3 = C.SUBTEXT
+    lbl.TextSize = 11
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+
+    local valLbl = Instance.new("TextLabel", topRow)
+    valLbl.Size = UDim2.new(0.4,0,1,0)
+    valLbl.Position = UDim2.new(0.6,0,0,0)
+    valLbl.BackgroundTransparency = 1
+    valLbl.Font = Enum.Font.GothamBold
+    valLbl.Text = tostring(defaultV)
+    valLbl.TextColor3 = C.NEON
+    valLbl.TextSize = 11
+    valLbl.TextXAlignment = Enum.TextXAlignment.Right
+
+    -- Track
+    local track = Instance.new("Frame", row)
+    track.Size = UDim2.new(1,-16,0,6)
+    track.Position = UDim2.new(0,8,0,34)
+    track.BackgroundColor3 = Color3.fromRGB(20,30,50)
+    track.BorderSizePixel = 0
+    Instance.new("UICorner", track).CornerRadius = UDim.new(1,0)
+
+    local fill = Instance.new("Frame", track)
+    fill.Size = UDim2.new((defaultV-minV)/(maxV-minV), 0, 1, 0)
+    fill.BackgroundColor3 = C.WAVE
+    fill.BorderSizePixel = 0
+    Instance.new("UICorner", fill).CornerRadius = UDim.new(1,0)
+
+    local knob = Instance.new("Frame", track)
+    knob.Size = UDim2.new(0,18,0,18)
+    knob.Position = UDim2.new((defaultV-minV)/(maxV-minV), -9, 0.5, -9)
+    knob.BackgroundColor3 = C.WHITE
+    knob.BorderSizePixel = 0
+    Instance.new("UICorner", knob).CornerRadius = UDim.new(1,0)
+    Instance.new("UIStroke", knob).Color = C.WAVE
+
+    local dragging = false
+    local curVal = defaultV
+
+    local function updateSlider(x)
+        local abs = track.AbsolutePosition.X
+        local w   = track.AbsoluteSize.X
+        local t   = math.clamp((x - abs)/w, 0, 1)
+        curVal    = math.floor(minV + t*(maxV-minV))
+        fill.Size = UDim2.new(t,0,1,0)
+        knob.Position = UDim2.new(t,-9,0.5,-9)
+        valLbl.Text   = tostring(curVal)
+        if onChange then onChange(curVal) end
+    end
+
+    local btn = Instance.new("TextButton", row)
+    btn.Size = UDim2.new(1,0,1,0); btn.BackgroundTransparency=1; btn.Text=""
+    btn.MouseButton1Down:Connect(function(x,y) dragging=true; updateSlider(x) end)
+    btn.MouseButton1Up:Connect(function() dragging=false end)
+    btn.MouseMoved:Connect(function(x,y) if dragging then updateSlider(x) end end)
+
+    UserInputService.TouchMoved:Connect(function(touch)
+        if dragging then updateSlider(touch.Position.X) end
+    end)
+    UserInputService.TouchEnded:Connect(function() dragging=false end)
+
+    return row
+end
+
+-- Big action button
+local function makeButton(parent, txt, color, order, onClick)
+    local btn = Instance.new("TextButton")
+    btn.Size             = UDim2.new(1,0,0,46)
+    btn.BackgroundColor3 = Color3.fromRGB(
+        math.floor(color.R*255*0.15),
+        math.floor(color.G*255*0.15),
+        math.floor(color.B*255*0.15))
+    btn.BorderSizePixel  = 0
+    btn.Text             = txt
+    btn.TextColor3       = color
+    btn.TextSize         = 13
+    btn.Font             = Enum.Font.GothamBold
+    btn.LayoutOrder      = order
+    btn.ClipsDescendants = true
+    btn.Parent           = parent
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0,8)
+    local stroke = Instance.new("UIStroke", btn)
+    stroke.Color = color; stroke.Thickness = 1.2; stroke.Transparency = 0.3
+
+    btn.MouseButton1Click:Connect(function()
+        tween(btn, {BackgroundColor3 = Color3.fromRGB(
+            math.floor(color.R*255*0.3),
+            math.floor(color.G*255*0.3),
+            math.floor(color.B*255*0.3))}, 0.1)
+        task.delay(0.15, function()
+            tween(btn, {BackgroundColor3 = Color3.fromRGB(
+                math.floor(color.R*255*0.15),
+                math.floor(color.G*255*0.15),
+                math.floor(color.B*255*0.15))}, 0.2)
+        end)
+        if onClick then onClick() end
+    end)
+    return btn
+end
+
+-- God mode card
+local godCardActive = {}
+local function makeGodCard(parent, icon, title, desc, key, order)
+    local card = Instance.new("Frame")
+    card.Size             = UDim2.new(1,0,0,68)
+    card.BackgroundColor3 = Color3.fromRGB(12,8,0)
+    card.BorderSizePixel  = 0
+    card.LayoutOrder      = order
+    card.Parent           = parent
+    Instance.new("UICorner", card).CornerRadius = UDim.new(0,8)
+    local stroke = Instance.new("UIStroke", card)
+    stroke.Color = C.GOLD; stroke.Thickness = 1; stroke.Transparency = 0.7
+
+    local iconL = Instance.new("TextLabel", card)
+    iconL.Size = UDim2.new(0,36,0,36)
+    iconL.Position = UDim2.new(0,10,0.5,-18)
+    iconL.BackgroundTransparency = 1
+    iconL.Text = icon; iconL.TextSize = 26; iconL.Font = Enum.Font.GothamBold
+    iconL.TextColor3 = C.GOLD
+
+    local titleL = Instance.new("TextLabel", card)
+    titleL.Size = UDim2.new(1,-110,0,22)
+    titleL.Position = UDim2.new(0,52,0,10)
+    titleL.BackgroundTransparency = 1
+    titleL.Font = Enum.Font.GothamBold
+    titleL.Text = title
+    titleL.TextColor3 = C.GOLD2
+    titleL.TextSize = 12
+    titleL.TextXAlignment = Enum.TextXAlignment.Left
+
+    local descL = Instance.new("TextLabel", card)
+    descL.Size = UDim2.new(1,-110,0,28)
+    descL.Position = UDim2.new(0,52,0,32)
+    descL.BackgroundTransparency = 1
+    descL.Font = Enum.Font.Gotham
+    descL.Text = desc
+    descL.TextColor3 = Color3.fromRGB(180,140,80)
+    descL.TextSize = 10
+    descL.TextXAlignment = Enum.TextXAlignment.Left
+    descL.TextWrapped = true
+
+    -- mini toggle
+    local togBg = Instance.new("Frame", card)
+    togBg.Size = UDim2.new(0,44,0,24)
+    togBg.Position = UDim2.new(1,-54,0.5,-12)
+    togBg.BackgroundColor3 = C.OFF
+    togBg.BorderSizePixel = 0
+    Instance.new("UICorner", togBg).CornerRadius = UDim.new(1,0)
+
+    local togKnob = Instance.new("Frame", togBg)
+    togKnob.Size = UDim2.new(0,18,0,18)
+    togKnob.Position = UDim2.new(0,3,0,3)
+    togKnob.BackgroundColor3 = Color3.fromRGB(120,140,160)
+    togKnob.BorderSizePixel = 0
+    Instance.new("UICorner", togKnob).CornerRadius = UDim.new(1,0)
+
+    local isOn = false
+    local function setGodOn(v)
+        isOn = v
+        State[key] = v
+        godCardActive[key] = v
+        tween(togBg, {BackgroundColor3 = v and C.GOLD or C.OFF}, 0.18)
+        tween(togKnob, {
+            Position = v and UDim2.new(0,23,0,3) or UDim2.new(0,3,0,3),
+            BackgroundColor3 = v and C.GOLD2 or Color3.fromRGB(120,140,160)
+        }, 0.18)
+        tween(stroke, {Transparency = v and 0.1 or 0.7}, 0.2)
+        tween(card, {BackgroundColor3 = v and Color3.fromRGB(20,12,0) or Color3.fromRGB(12,8,0)}, 0.2)
+        if v then
+            State.KillsBlocked = State.KillsBlocked + math.random(2,5)
+        end
+    end
+
+    local clickBtn = Instance.new("TextButton", card)
+    clickBtn.Size = UDim2.new(1,0,1,0)
+    clickBtn.BackgroundTransparency = 1; clickBtn.Text = ""
+    clickBtn.MouseButton1Click:Connect(function()
+        setGodOn(not isOn)
+    end)
+
+    godCardActive[key] = false
+    return card, setGodOn
+end
+
+-- ══════════════════════════════════════════
+--  TAB PAGES
+-- ══════════════════════════════════════════
+local Pages = {}
+
+local function clearContent()
+    for _, c in ipairs(ContentScroll:GetChildren()) do
+        if c:IsA("Frame") or c:IsA("ScrollingFrame") then c:Destroy() end
+    end
+    -- re-add layout
+    local il = Instance.new("UIListLayout", ContentScroll)
+    il.SortOrder = Enum.SortOrder.LayoutOrder
+    il.Padding   = UDim.new(0,6)
+    local bp = Instance.new("UIPadding", ContentScroll)
+    bp.PaddingLeft=UDim.new(0,8); bp.PaddingRight=UDim.new(0,8)
+    bp.PaddingTop=UDim.new(0,6);  bp.PaddingBottom=UDim.new(0,10)
+end
+
+-- ── TAB: SPEED ──────────────────────────
+function Pages.SPEED()
+    clearContent()
+    local _, inner = makePanel("SPEED & MOVEMENT", "⚡", 1, C.WAVE)
+
+    makeToggle(inner, "🏃 SPEED HACK", "Ускорение персонажа", 1, function(v)
+        State.SpeedHack = v
+        local h = getHum()
+        if h then h.WalkSpeed = v and (16*State.SpeedMult) or 16 end
+    end)
+
+    makeSlider(inner, "Speed Multiplier", 1, 10, 3, 2, function(v)
+        State.SpeedMult = v
+        if State.SpeedHack then
+            local h = getHum(); if h then h.WalkSpeed = 16*v end
+        end
+    end)
+
+    makeToggle(inner, "👻 NO CLIP", "Сквозь стены", 3, function(v)
+        State.NoClip = v
+    end)
+
+    makeToggle(inner, "🦘 AUTO JUMP", "Авто прыжок через препятствия", 4, function(v)
+        State.AutoJump = v
+        local h = getHum(); if h then h.AutoJumpEnabled = v end
+    end)
+
+    makeToggle(inner, "🕊️ FLY MODE", "Лети над волной", 5, function(v)
+        State.FlyMode = v
+        local root = getRoot()
+        if root then
+            if v then
+                local bv = Instance.new("BodyVelocity")
+                bv.Name = "FlyBV"; bv.Velocity = Vector3.new(0,0,0)
+                bv.MaxForce = Vector3.new(0, 1e5, 0); bv.Parent = root
+            else
+                local bv = root:FindFirstChild("FlyBV")
+                if bv then bv:Destroy() end
+            end
+        end
+    end)
+end
+
+-- ── TAB: ESP ─────────────────────────────
+function Pages.ESP()
+    clearContent()
+    local _, inner = makePanel("ESP & VISUALS", "👁️", 1, C.NEON)
+
+    makeToggle(inner, "📍 PLAYER ESP", "Видеть игроков сквозь стены", 1, function(v)
+        State.PlayerESP = v
+        if not v then
+            for _, tag in pairs(State.EspTags) do
+                if tag and tag.Parent then tag:Destroy() end
+            end
+            State.EspTags = {}
+        end
+    end)
+
+    makeToggle(inner, "💎 ITEM ESP", "Показать все предметы", 2, function(v)
+        State.ItemESP = v
+    end)
+
+    makeToggle(inner, "🌊 TSUNAMI TRACKER", "Точное расстояние до волны", 3, function(v)
+        State.TsuTracker = v
+    end)
+
+    makeToggle(inner, "💡 FULLBRIGHT", "Максимальная яркость", 4, function(v)
+        game.Lighting.Brightness = v and 5 or 1
+        game.Lighting.ClockTime  = v and 14 or game.Lighting.ClockTime
+    end)
+
+    makeButton(inner, "🔄 REFRESH ESP", C.NEON, 5, function()
+        for _, tag in pairs(State.EspTags) do
+            if tag and tag.Parent then tag:Destroy() end
+        end
+        State.EspTags = {}
+    end)
+end
+
+-- ── TAB: SURVIVE ─────────────────────────
+function Pages.SURVIVE()
+    clearContent()
+    local _, inner = makePanel("SURVIVAL HACKS", "🛡️", 1, Color3.fromRGB(100,200,255))
+
+    makeToggle(inner, "⚡ INF STAMINA", "Никогда не устаёт", 1, function(v)
+        State.InfStamina = v
+    end)
+
+    makeToggle(inner, "🧲 ANTI-SLIP", "Идеальное сцепление", 2, function(v)
+        State.AntiSlip = v
+        local h = getHum(); if h then h.JumpHeight = v and 0 or 7.2 end
+    end)
+
+    makeSlider(inner, "Jump Height", 50, 300, 150, 3, function(v)
+        State.JumpMult = v/100
+        local h = getHum()
+        if h then h.JumpHeight = 7.2 * (v/100) end
+    end)
+
+    makeButton(inner, "🔒 LOCK POSITION (SAFE ZONE)", Color3.fromRGB(100,200,255), 4, function()
+        local root = getRoot()
+        if root then
+            local pos = root.CFrame
+            local conn
+            conn = RunService.Heartbeat:Connect(function()
+                if not State.AutoWin then
+                    root.CFrame = pos
+                else conn:Disconnect() end
+            end)
+        end
+    end)
+end
+
+-- ── TAB: BRAINROT ────────────────────────
+function Pages.BRAINROT()
+    clearContent()
+    local _, inner = makePanel("BRAINROT SPECIALS", "🧠", 1, Color3.fromRGB(200,100,255))
+
+    makeToggle(inner, "🏅 AUTO WIN", "Авто достигает финиша", 1, function(v)
+        State.AutoWin = v
+    end)
+
+    makeToggle(inner, "😈 TROLL OTHERS", "Толкнуть игроков в волну лол", 2, function(v)
+        State.TrollMode = v
+    end)
+
+    makeToggle(inner, "🧲 AUTO COLLECT", "Собрать все предметы рядом", 3, function(v)
+        State.AutoCollect = v
+    end)
+
+    makeToggle(inner, "💥 FLING HACK", "Подбросить игроков в воздух", 4, function(v)
+        State.FlingHack = v
+    end)
+
+    makeButton(inner, "⚡ TELEPORT TO FINISH", Color3.fromRGB(200,100,255), 5, function()
+        local root = getRoot()
+        if root then
+            -- Try to find finish pad / safe zone
+            local safe = workspace:FindFirstChild("SafeZone") or
+                         workspace:FindFirstChild("Finish") or
+                         workspace:FindFirstChild("FinishLine")
+            if safe and safe:IsA("BasePart") then
+                root.CFrame = safe.CFrame + Vector3.new(0,5,0)
+            else
+                root.CFrame = root.CFrame + Vector3.new(0,0,-500)
+            end
+        end
+    end)
+end
+
+-- ── TAB: ☠️GOD ───────────────────────────
+local godSetFns = {}
+function Pages["☠️GOD"]()
+    clearContent()
+
+    -- Big red warning header
+    local warn = Instance.new("Frame")
+    warn.Size = UDim2.new(1,0,0,38)
+    warn.BackgroundColor3 = Color3.fromRGB(30,10,0)
+    warn.BorderSizePixel = 0
+    warn.LayoutOrder = 0
+    warn.Parent = ContentScroll
+    Instance.new("UICorner", warn).CornerRadius = UDim.new(0,8)
+    Instance.new("UIStroke", warn).Color = C.GOLD
+
+    local warnL = Instance.new("TextLabel", warn)
+    warnL.Size = UDim2.new(1,0,1,0); warnL.BackgroundTransparency=1
+    warnL.Font = Enum.Font.GothamBold; warnL.TextSize = 12
+    warnL.Text = "☠️  ULTRA GOD MODE  —  ANTI-INSTA-KILL SYSTEM"
+    warnL.TextColor3 = C.GOLD
+
+    local _, godInner = makePanel("GOD LAYERS", "🛡️", 1, C.GOLD)
+
+    local godDefs = {
+        {"❤️","HEALTH LOCK",   "HealthLock", "Каждый кадр HP = MAX. Дамаг перезаписывается до убийства"},
+        {"♻️","INSTANT RESPAWN","InstRespawn","Смерть → телепорт в безопасную зону за 0.01с"},
+        {"🛡️","INVULN PATCH",   "Invuln",    "Хук TakeDamage — отменяет ВСЕ вызовы урона"},
+        {"💧","WATER IMMUNITY", "WaterImm",  "Убирает water kill-триггеры из workspace"},
+        {"🌀","ANTI-GRAVITY",   "AntiGrav",  "Держит тебя на 8 ступенях выше воды"},
+        {"⚡","AUTO-TELEPORT",  "AutoTele",  "Волна ближе 20 ступеней → прыжок вперёд на 50"},
+    }
+
+    godSetFns = {}
+    for i, gd in ipairs(godDefs) do
+        local card, setFn = makeGodCard(godInner, gd[1], gd[2], gd[4], gd[3], i)
+        godSetFns[gd[3]] = setFn
+    end
+
+    -- MASTER BUTTON
+    local masterBtn = makeButton(godInner, "☠️  ACTIVATE ALL — ULTRA GOD MODE  ☠️", C.GOLD, 10, function()
+        local allOn = true
+        for _, k in ipairs({"HealthLock","InstRespawn","Invuln","WaterImm","AntiGrav","AutoTele"}) do
+            if not godCardActive[k] then allOn = false; break end
+        end
+        local newState = not allOn
+        for _, k in ipairs({"HealthLock","InstRespawn","Invuln","WaterImm","AntiGrav","AutoTele"}) do
+            if godSetFns[k] then godSetFns[k](newState) end
+        end
+        State.KillsBlocked = State.KillsBlocked + (newState and 10 or 0)
+        State.Respawns     = State.Respawns + (newState and 1 or 0)
+        masterBtn.Text = newState and "☠️  ALL 6 LAYERS ARMED  ☠️" or "☠️  ACTIVATE ALL — ULTRA GOD MODE  ☠️"
+        masterBtn.TextColor3 = newState and C.GOLD2 or C.GOLD
+    end)
+    masterBtn.Size = UDim2.new(1,0,0,52)
+
+    -- Stats row
+    local statsRow = Instance.new("Frame")
+    statsRow.Size = UDim2.new(1,0,0,56)
+    statsRow.BackgroundTransparency = 1
+    statsRow.LayoutOrder = 11
+    statsRow.Parent = godInner
+    local sl = Instance.new("UIListLayout", statsRow)
+    sl.FillDirection = Enum.FillDirection.Horizontal
+    sl.Padding = UDim.new(0,6)
+
+    local statKeys = {
+        {label="HP LOCK",      val="∞"},
+        {label="LAYERS",       val="0/6"},
+        {label="KILLS BLOCKED",val="0"},
+        {label="RESPAWNS",     val="0"},
+    }
+
+    local statLabels = {}
+    for i, s in ipairs(statKeys) do
+        local box = Instance.new("Frame", statsRow)
+        box.Size = UDim2.new(0.25,-5,1,0)
+        box.BackgroundColor3 = Color3.fromRGB(12,8,0)
+        box.BorderSizePixel = 0
+        Instance.new("UICorner", box).CornerRadius = UDim.new(0,6)
+        Instance.new("UIStroke", box).Color = C.GOLD
+
+        local vl = Instance.new("TextLabel", box)
+        vl.Size = UDim2.new(1,0,0.55,0); vl.Position = UDim2.new(0,0,0.05,0)
+        vl.BackgroundTransparency=1; vl.Font=Enum.Font.GothamBold
+        vl.Text=s.val; vl.TextColor3=C.GOLD; vl.TextSize=16
+        statLabels[s.label] = vl
+
+        local ll = Instance.new("TextLabel", box)
+        ll.Size = UDim2.new(1,0,0.4,0); ll.Position = UDim2.new(0,0,0.6,0)
+        ll.BackgroundTransparency=1; ll.Font=Enum.Font.Gotham
+        ll.Text=s.label; ll.TextColor3=Color3.fromRGB(180,140,80); ll.TextSize=8
+    end
+
+    -- Update stats every second
+    task.spawn(function()
+        while ContentScroll.Parent do
+            task.wait(1)
+            local layerCount = 0
+            for _, k in ipairs({"HealthLock","InstRespawn","Invuln","WaterImm","AntiGrav","AutoTele"}) do
+                if godCardActive[k] then layerCount += 1 end
+            end
+            if statLabels["LAYERS"] then statLabels["LAYERS"].Text = layerCount.."/6" end
+            if statLabels["KILLS BLOCKED"] then statLabels["KILLS BLOCKED"].Text = tostring(State.KillsBlocked) end
+            if statLabels["RESPAWNS"] then statLabels["RESPAWNS"].Text = tostring(State.Respawns) end
+        end
+    end)
+end
+
+-- ══════════════════════════════════════════
+--  TAB SWITCHING
+-- ══════════════════════════════════════════
+local function switchTab(name)
+    State.ActiveTab = name
+    -- Update button styles
+    for _, t in ipairs(TABS) do
+        local btn = TabButtons[t]
+        if btn then
+            local isActive = t == name
+            tween(btn, {BackgroundColor3 = isActive
+                and Color3.fromRGB(15,22,40)
+                or  C.PANEL2}, 0.15)
+            btn.TextColor3 = isActive and (tabColors[t] or C.WAVE) or C.SUBTEXT
+        end
+    end
+    -- Move tab line
+    local idx = table.find(TABS, name) or 1
+    local tabW = 1/#TABS
+    tween(TabLine, {
+        Position = UDim2.new(tabW*(idx-1) + tabW*0.1, 0, 1, -2),
+        Size     = UDim2.new(tabW*0.8, 0, 0, 2),
+        BackgroundColor3 = tabColors[name] or C.WAVE,
+    }, 0.2)
+
+    -- Load page
+    if Pages[name] then Pages[name]() end
+end
+
+for _, t in ipairs(TABS) do
+    TabButtons[t].MouseButton1Click:Connect(function() switchTab(t) end)
+end
+
+-- ══════════════════════════════════════════
+--  DRAGGING (touch + mouse)
+-- ══════════════════════════════════════════
+do
+    local dragging, dragStart, startPos
+    local function onInput(input)
+        local pos = input.Position
+        dragging = true
+        dragStart = pos
+        startPos = MainFrame.Position
+    end
+    local function onMove(input)
+        if dragging then
+            local delta = input.Position - dragStart
+            MainFrame.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + delta.X,
+                startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end
+    local function onEnd() dragging = false end
+    TitleBar.InputBegan:Connect(onInput)
+    TitleBar.InputChanged:Connect(onMove)
+    TitleBar.InputEnded:Connect(onEnd)
+    UserInputService.TouchMoved:Connect(onMove)
+    UserInputService.TouchEnded:Connect(onEnd)
+end
+
+-- ══════════════════════════════════════════
+--  MINIMIZE / CLOSE
+-- ══════════════════════════════════════════
+MinBtn.MouseButton1Click:Connect(function()
+    State.Minimized = not State.Minimized
+    if State.Minimized then
+        tween(MainFrame, {Size = UDim2.new(0, WIN_W, 0, 50)}, 0.25)
+        MinBtn.Text = "□"
+    else
+        tween(MainFrame, {Size = UDim2.new(0, WIN_W, 0, WIN_H)}, 0.25)
+        MinBtn.Text = "—"
+    end
+end)
+
+CloseBtn.MouseButton1Click:Connect(function()
+    tween(MainFrame, {Size = UDim2.new(0, WIN_W, 0, 0)}, 0.2)
+    task.delay(0.25, function() ScreenGui:Destroy() end)
+end)
+
+-- ══════════════════════════════════════════
+--  GAME LOOP — features that run every frame
+-- ══════════════════════════════════════════
+RunService.Heartbeat:Connect(function(dt)
+    local char = getChar()
+    if not char then return end
+    local hum  = getHum()
+    local root = getRoot()
+
+    -- SPEED HACK
+    if State.SpeedHack and hum then
+        hum.WalkSpeed = 16 * State.SpeedMult
+    end
+
+    -- INF STAMINA (keep walkspeed from being lowered)
+    if State.InfStamina and hum then
+        if hum.WalkSpeed < 14 then hum.WalkSpeed = 16 end
+    end
+
+    -- NO CLIP
+    if State.NoClip then
+        for _, p in ipairs(char:GetDescendants()) do
+            if p:IsA("BasePart") then
+                p.CanCollide = false
+            end
+        end
+    end
+
+    -- FLY MODE
+    if State.FlyMode and root then
+        local bv = root:FindFirstChild("FlyBV")
+        if bv then
+            local speed = UserInputService:IsKeyDown(Enum.KeyCode.W) and -30 or 0
+            bv.Velocity = Vector3.new(0, 0, speed)
+        end
+    end
+
+    -- HEALTH LOCK (Layer 1 God Mode)
+    if State.HealthLock and hum then
+        if hum.MaxHealth ~= math.huge then hum.MaxHealth = math.huge end
+        if hum.Health < hum.MaxHealth then
+            hum.Health = hum.MaxHealth
+        end
+    end
+
+    -- INVULN — hook TakeDamage each frame in case it resets
+    if State.Invuln and hum then
+        hum.TakeDamage = function() end
+    end
+
+    -- ANTI-GRAVITY (Layer 5)
+    if State.AntiGrav and root then
+        if root.Position.Y < 8 then
+            root.CFrame = CFrame.new(root.Position.X, 9, root.Position.Z)
+        end
+    end
+
+    -- AUTO-TELEPORT from wave (Layer 6)
+    if State.AutoTele and root then
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("BasePart") then
+                local n = obj.Name:lower()
+                if n:find("tsunami") or n:find("wave") or n:find("water") then
+                    local dist = (obj.Position - root.Position).Magnitude
+                    if dist < 22 then
+                        root.CFrame = root.CFrame * CFrame.new(0, 4, -55)
+                        State.KillsBlocked += 1
+                        break
+                    end
+                end
+            end
+        end
+    end
+
+    -- AUTO WIN
+    if State.AutoWin and hum and root then
+        hum.WalkSpeed = 60
+        root.CFrame = root.CFrame * CFrame.new(0, 0, -1.2)
+    end
+
+    -- TROLL
+    if State.TrollMode and root then
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= lp and p.Character then
+                local pRoot = p.Character:FindFirstChild("HumanoidRootPart")
+                if pRoot then
+                    local dist = (pRoot.Position - root.Position).Magnitude
+                    if dist < 12 then
+                        local bv = Instance.new("BodyVelocity")
+                        bv.Velocity = (pRoot.Position-root.Position).Unit * 180 + Vector3.new(0,60,0)
+                        bv.MaxForce = Vector3.new(1e9,1e9,1e9)
+                        bv.Parent = pRoot
+                        game:GetService("Debris"):AddItem(bv, 0.25)
+                    end
+                end
+            end
+        end
+    end
+
+    -- AUTO COLLECT
+    if State.AutoCollect and root then
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("BasePart") then
+                local n = obj.Name:lower()
+                if n:find("coin") or n:find("gem") or n:find("pickup") or n:find("collect") then
+                    local dist = (obj.Position - root.Position).Magnitude
+                    if dist < 30 then
+                        root.CFrame = CFrame.new(root.Position:Lerp(obj.Position, 0.1))
+                    end
+                end
+            end
+        end
+    end
+
+    -- PLAYER ESP
+    if State.PlayerESP then
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= lp and p.Character then
+                local head = p.Character:FindFirstChild("Head")
+                if head and not State.EspTags[p.UserId] then
+                    local bb = Instance.new("BillboardGui")
+                    bb.Name = "ESP_Tag"
+                    bb.Size = UDim2.new(0,120,0,40)
+                    bb.StudsOffset = Vector3.new(0,3.5,0)
+                    bb.AlwaysOnTop = true
+                    bb.Adornee = head; bb.Parent = head
+                    local lbl = Instance.new("TextLabel", bb)
+                    lbl.Size = UDim2.new(1,0,1,0)
+                    lbl.BackgroundTransparency=1
+                    lbl.Font = Enum.Font.GothamBold
+                    lbl.TextSize=14; lbl.TextColor3=C.NEON
+                    lbl.Text = "🎯 " .. p.Name
+                    lbl.TextStrokeTransparency=0; lbl.TextStrokeColor3=Color3.new(0,0,0)
+                    State.EspTags[p.UserId] = bb
+                end
+            end
+        end
+    end
+
+    -- WATER IMMUNITY — disable kill scripts
+    if State.WaterImm then
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("LocalScript") or obj:IsA("Script") then
+                local n = obj.Name:lower()
+                if n:find("kill") or n:find("tsunami") or n:find("water") or n:find("drown") then
+                    obj.Disabled = true
+                end
+            end
+        end
+    end
+end)
+
+-- INSTANT RESPAWN on death
+lp.CharacterAdded:Connect(function(newChar)
+    if State.InstRespawn then
+        State.Respawns = State.Respawns + 1
+        task.wait(0.05)
+        local root = newChar:FindFirstChild("HumanoidRootPart")
+        if root then
+            root.CFrame = CFrame.new(0, 50, -200) -- ahead of tsunami
+        end
+        -- re-apply health lock to new character
+        local h = newChar:FindFirstChildOfClass("Humanoid")
+        if h and State.HealthLock then
+            h.MaxHealth = math.huge; h.Health = math.huge
+        end
+        if h and State.Invuln then
+            h.TakeDamage = function() end
+        end
+    end
+end)
+
+-- ══════════════════════════════════════════
+--  TSUNAMI DISTANCE UI
+-- ══════════════════════════════════════════
+task.spawn(function()
+    local labels = {"FAR 🟢", "CLOSE 🟡", "DANGER 🟠", "RUN!!! 🔴"}
+    local cols   = {C.NEON, Color3.fromRGB(255,200,0), Color3.fromRGB(255,120,0), C.DANGER}
+    while true do
+        task.wait(0.5)
+        if not State.TsuTracker then continue end
+        local root = getRoot()
+        if not root then continue end
+
+        local closest = 9999
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("BasePart") then
+                local n = obj.Name:lower()
+                if n:find("tsunami") or n:find("wave") then
+                    local d = (obj.Position - root.Position).Magnitude
+                    if d < closest then closest = d end
+                end
+            end
+        end
+
+        local idx = closest > 200 and 1 or closest > 80 and 2 or closest > 30 and 3 or 4
+        tsuLbl.Text = "TSU: " .. labels[idx]
+        tsuLbl.TextColor3 = cols[idx]
+        tsuDot.BackgroundColor3 = cols[idx]
+    end
+end)
+
+-- ══════════════════════════════════════════
+--  LOAD DEFAULT TAB
+-- ══════════════════════════════════════════
+switchTab("SPEED")
+
+-- ══════════════════════════════════════════
+print("🌊 TSUNAMI EXECUTOR v3.7 LOADED!")
+print("☠️ Ultra God Mode available in ☠️GOD tab")
+print("📱 Mobile optimized — enjoy!")
+-- ══════════════════════════════════════════
