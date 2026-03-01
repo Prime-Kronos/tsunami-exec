@@ -1,0 +1,1006 @@
+-- ██████╗ ██████╗ ██╗███╗   ███╗███████╗
+-- ██╔══██╗██╔══██╗██║████╗ ████║██╔════╝
+-- ██████╔╝██████╔╝██║██╔████╔██║█████╗
+-- ██╔═══╝ ██╔══██╗██║██║╚██╔╝██║██╔══╝
+-- ██║     ██║  ██║██║██║ ╚═╝ ██║███████╗
+-- PrimejTsuHub v5.3 | @Primejtsu | MM2
+
+local Players      = game:GetService("Players")
+local RunService   = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local UIS          = game:GetService("UserInputService")
+local Lighting     = game:GetService("Lighting")
+local LP           = Players.LocalPlayer
+local Camera       = workspace.CurrentCamera
+
+-- forward declaration
+local showGUI
+
+local CFG = {
+    god=false, speed=false, bhop=false, noclip=false,
+    esp=false, coinFarm=false, knife=false, autoReward=false,
+    fullbright=false, antiAfk=true, hide=false, bringCoins=false,
+}
+local coinCount = 0
+local espObjects = {}
+
+local function getChar() return LP.Character end
+local function getHRP()  local c=getChar() return c and c:FindFirstChild("HumanoidRootPart") end
+local function getHum()  local c=getChar() return c and c:FindFirstChildOfClass("Humanoid") end
+
+-- ══ GOD MODE ══
+local function applyGod(on)
+    pcall(function()
+        local c = getChar() if not c then return end
+        for _, p in ipairs(c:GetDescendants()) do
+            if p:IsA("BasePart") then
+                p.LocalTransparencyModifier = on and 1 or 0
+                if on then p.CanCollide = false end
+            end
+        end
+        local h = getHum()
+        if h and on then h.MaxHealth=1e6 h.Health=1e6 h.BreakJointsOnDeath=false end
+    end)
+end
+
+RunService.Heartbeat:Connect(function()
+    if not CFG.god then return end
+    local h = getHum() if not h then return end
+    if h.Health < 1e6 then h.Health = 1e6 end
+    h.BreakJointsOnDeath = false
+    local c = getChar() if not c then return end
+    for _, p in ipairs(c:GetDescendants()) do
+        if p:IsA("BasePart") then p.LocalTransparencyModifier = 1 end
+    end
+end)
+
+LP.CharacterAdded:Connect(function()
+    task.wait(0.5)
+    if CFG.god then applyGod(true) end
+end)
+
+-- ══ ANTI AFK ══
+local afkTick = tick()
+RunService.Heartbeat:Connect(function()
+    if not CFG.antiAfk then return end
+    if tick() - afkTick < 5 then return end
+    afkTick = tick()
+    pcall(function()
+        local vu = game:GetService("VirtualUser")
+        vu:Button2Down(Vector2.new(0,0), Camera.CFrame)
+        task.wait(0.05)
+        vu:Button2Up(Vector2.new(0,0), Camera.CFrame)
+    end)
+    pcall(function() local h=getHum() if h then h.Jump=true end end)
+end)
+pcall(function()
+    LP.Idled:Connect(function()
+        if not CFG.antiAfk then return end
+        pcall(function()
+            local vu = game:GetService("VirtualUser")
+            vu:Button2Down(Vector2.new(0,0), Camera.CFrame)
+            task.wait(0.05)
+            vu:Button2Up(Vector2.new(0,0), Camera.CFrame)
+        end)
+    end)
+end)
+
+-- ══ SPEED / BHOP ══
+RunService.Heartbeat:Connect(function()
+    local h = getHum() if not h then return end
+    if CFG.speed then
+        if h.WalkSpeed < 26 then h.WalkSpeed = h.WalkSpeed + 0.5 end
+    elseif not CFG.bhop then
+        if h.WalkSpeed ~= 16 then h.WalkSpeed = 16 end
+    end
+    if CFG.bhop then
+        h.WalkSpeed = 24
+        if h.FloorMaterial ~= Enum.Material.Air then h.Jump = true end
+    end
+end)
+
+-- ══ NOCLIP ══
+RunService.Stepped:Connect(function()
+    if not CFG.noclip then return end
+    local c=getChar() if not c then return end
+    for _,p in ipairs(c:GetDescendants()) do
+        if p:IsA("BasePart") then p.CanCollide=false end
+    end
+end)
+
+-- ══════════════════════════════════════════════════════════════
+--   COIN FARM v3 — МГНОВЕННЫЙ ПОДБОР
+--   1) Монеты телепортируются прямо под ноги игроку
+--   2) Персонаж прыгает чтобы триггер сработал
+--   3) Петля каждые 0.1 сек — максимально быстро
+-- ══════════════════════════════════════════════════════════════
+local function isCoin(o)
+    if not (o:IsA("BasePart") or o:IsA("MeshPart") or o:IsA("UnionOperation")) then return false end
+    local n = o.Name:lower()
+    return (n=="coin" or n:find("coin") or n=="dropcoin" or n=="goldcoin" or n=="silvercoin")
+        and o.Parent ~= nil
+        and o.Transparency < 0.9
+        and o.Parent ~= LP.Character
+end
+
+-- COIN FARM — телепорт монет к игроку + мгновенный подбор
+task.spawn(function()
+    while task.wait(0.1) do
+        if not CFG.coinFarm then continue end
+        local hrp = getHRP()
+        local hum = getHum()
+        if not hrp or not hum then continue end
+
+        for _, o in ipairs(workspace:GetDescendants()) do
+            if isCoin(o) then
+                pcall(function()
+                    -- Телепорт монеты прямо на позицию игрока
+                    o.CFrame = hrp.CFrame
+                    o.Velocity = Vector3.new(0,0,0)
+                end)
+            end
+        end
+
+        -- Прыжок для триггера подбора
+        pcall(function()
+            hum.Jump = true
+        end)
+
+        -- Через 0.05 сек — ещё раз прыжок для надёжности
+        task.wait(0.05)
+        pcall(function()
+            if hum then hum.Jump = true end
+        end)
+    end
+end)
+
+-- BRING COINS — то же самое, отдельная кнопка
+task.spawn(function()
+    while task.wait(0.1) do
+        if not CFG.bringCoins then continue end
+        local hrp = getHRP()
+        local hum = getHum()
+        if not hrp or not hum then continue end
+
+        for _, o in ipairs(workspace:GetDescendants()) do
+            if isCoin(o) then
+                pcall(function()
+                    o.CFrame = hrp.CFrame
+                    o.Velocity = Vector3.new(0,0,0)
+                end)
+            end
+        end
+
+        pcall(function()
+            hum.Jump = true
+        end)
+    end
+end)
+
+-- Счётчик монет
+task.spawn(function()
+    local prevCoins = {}
+    while task.wait(0.2) do
+        if not CFG.coinFarm and not CFG.bringCoins then continue end
+        for _, o in ipairs(workspace:GetDescendants()) do
+            if isCoin(o) then
+                prevCoins[o] = prevCoins[o] or true
+            end
+        end
+        for obj in pairs(prevCoins) do
+            if not obj or not obj.Parent or obj.Transparency >= 0.9 then
+                coinCount = coinCount + 1
+                prevCoins[obj] = nil
+            end
+        end
+    end
+end)
+
+-- ══ KNIFE AURA ══
+task.spawn(function()
+    while task.wait(0.5) do
+        if not CFG.knife then continue end
+        local hum=getHum() local hrp=getHRP()
+        if not hum or not hrp then continue end
+        for _,p in ipairs(Players:GetPlayers()) do
+            if p~=LP and p.Character then
+                local t=p.Character:FindFirstChild("HumanoidRootPart")
+                local th=p.Character:FindFirstChildOfClass("Humanoid")
+                if t and th and th.Health>0 and (hrp.Position-t.Position).Magnitude<=12 then
+                    hum:MoveTo(t.Position)
+                end
+            end
+        end
+    end
+end)
+
+-- ══ AUTO REWARD ══
+RunService.Heartbeat:Connect(function()
+    if not CFG.autoReward then return end
+    pcall(function()
+        for _,g in ipairs(LP.PlayerGui:GetDescendants()) do
+            if g:IsA("TextButton") then
+                local t=g.Text:lower()
+                if t:find("play") or t:find("vote") or t:find("again") or t:find("ok") or t:find("ready") then
+                    g.MouseButton1Click:Fire()
+                end
+            end
+        end
+    end)
+end)
+
+-- ══ FULLBRIGHT ══
+local function setFB(v)
+    if v then
+        Lighting.Brightness=2.5 Lighting.ClockTime=14
+        Lighting.GlobalShadows=false
+        Lighting.Ambient=Color3.new(1,1,1)
+        Lighting.OutdoorAmbient=Color3.new(1,1,1)
+    else
+        Lighting.Brightness=1 Lighting.GlobalShadows=true
+        Lighting.Ambient=Color3.fromRGB(127,127,127)
+        Lighting.OutdoorAmbient=Color3.fromRGB(127,127,127)
+    end
+end
+
+-- ══ ESP ══
+local ROLE_COLORS={Murderer=Color3.fromRGB(255,60,60),Sheriff=Color3.fromRGB(60,140,255),Innocent=Color3.fromRGB(60,230,110)}
+local ROLE_LABELS={Murderer="🔪 УБИЙЦА",Sheriff="🔫 ШЕРИФ",Innocent="😇 НЕВИННЫЙ"}
+
+local function getRole(player)
+    local role="Innocent"
+    pcall(function()
+        local char=player.Character if not char then return end
+        for _,item in ipairs(char:GetChildren()) do
+            if item:IsA("Tool") then
+                local n=item.Name:lower()
+                if n:find("knife") or n:find("murder") or n:find("blade") then role="Murderer" return
+                elseif n:find("gun") or n:find("sheriff") or n:find("revolver") then role="Sheriff" return end
+            end
+        end
+        local bp=player:FindFirstChild("Backpack")
+        if bp then for _,item in ipairs(bp:GetChildren()) do
+            if item:IsA("Tool") then
+                local n=item.Name:lower()
+                if n:find("knife") or n:find("murder") then role="Murderer" return
+                elseif n:find("gun") or n:find("sheriff") then role="Sheriff" return end
+            end
+        end end
+    end)
+    return role
+end
+
+local function removeESP(p)
+    if espObjects[p] then pcall(function() espObjects[p]:Destroy() end) espObjects[p]=nil end
+end
+
+local function createESP(p)
+    if p==LP then return end removeESP(p)
+    local function setup(char)
+        local hrp=char:WaitForChild("HumanoidRootPart",5)
+        local hum=char:WaitForChild("Humanoid",5)
+        if not hrp or not hum then return end
+        local bb=Instance.new("BillboardGui") bb.Name="PTJESP" bb.AlwaysOnTop=true
+        bb.Size=UDim2.new(0,110,0,66) bb.StudsOffset=Vector3.new(0,3.5,0)
+        bb.Adornee=hrp bb.Parent=hrp bb.Enabled=false
+        local nL=Instance.new("TextLabel",bb) nL.Size=UDim2.new(1,0,0,20) nL.BackgroundTransparency=1 nL.Font=Enum.Font.GothamBold nL.TextSize=13 nL.Text=p.Name nL.TextStrokeTransparency=0 nL.TextStrokeColor3=Color3.new(0,0,0)
+        local rL=Instance.new("TextLabel",bb) rL.Size=UDim2.new(1,0,0,18) rL.Position=UDim2.new(0,0,0,20) rL.BackgroundTransparency=1 rL.Font=Enum.Font.GothamBold rL.TextSize=12 rL.TextStrokeTransparency=0 rL.TextStrokeColor3=Color3.new(0,0,0)
+        local hL=Instance.new("TextLabel",bb) hL.Size=UDim2.new(1,0,0,14) hL.Position=UDim2.new(0,0,0,38) hL.BackgroundTransparency=1 hL.Font=Enum.Font.Code hL.TextSize=11 hL.TextColor3=Color3.fromRGB(200,200,200) hL.TextStrokeTransparency=0 hL.TextStrokeColor3=Color3.new(0,0,0)
+        local dL=Instance.new("TextLabel",bb) dL.Size=UDim2.new(1,0,0,12) dL.Position=UDim2.new(0,0,0,52) dL.BackgroundTransparency=1 dL.Font=Enum.Font.Code dL.TextSize=10 dL.TextColor3=Color3.fromRGB(160,160,160) dL.TextStrokeTransparency=0 dL.TextStrokeColor3=Color3.new(0,0,0)
+        local function upd()
+            if not bb.Parent then return end
+            local role=getRole(p) local col=ROLE_COLORS[role]
+            nL.TextColor3=col rL.Text=ROLE_LABELS[role] rL.TextColor3=col
+            local hp=math.max(0,math.min(100,math.floor(hum.Health)))
+            hL.Text="❤ HP: "..hp
+            local myH=getHRP()
+            if myH then dL.Text="📍 "..math.floor((myH.Position-hrp.Position).Magnitude).." studs" end
+            bb.Enabled=CFG.esp
+        end
+        hum:GetPropertyChangedSignal("Health"):Connect(function() pcall(function() hL.Text="❤ HP: "..math.max(0,math.min(100,math.floor(hum.Health))) end) end)
+        char.ChildAdded:Connect(function(ch) if ch:IsA("Tool") then task.wait(0.2) pcall(upd) end end)
+        char.ChildRemoved:Connect(function(ch) if ch:IsA("Tool") then task.wait(0.2) pcall(upd) end end)
+        RunService.Heartbeat:Connect(function() if bb and bb.Parent then bb.Enabled=CFG.esp end end)
+        task.spawn(function() while bb and bb.Parent do pcall(upd) task.wait(1) end end)
+        espObjects[p]=bb pcall(upd)
+    end
+    if p.Character then task.spawn(function() setup(p.Character) end) end
+    p.CharacterAdded:Connect(function(c) task.wait(1) task.spawn(function() setup(c) end) end)
+end
+
+for _,p in ipairs(Players:GetPlayers()) do createESP(p) end
+Players.PlayerAdded:Connect(function(p) task.wait(1) createESP(p) end)
+Players.PlayerRemoving:Connect(function(p) removeESP(p) end)
+
+-- ════════════════════════════════════════════════════════════════
+--   ЗАСТАВКА v5.3 — 10 СЕКУНД
+--   Крупные животные, бегут волнами
+--   Тёмно-фиолетовый фон + звёздочки
+-- ════════════════════════════════════════════════════════════════
+if game.CoreGui:FindFirstChild("PTH53") then game.CoreGui.PTH53:Destroy() end
+local sg = Instance.new("ScreenGui", game.CoreGui)
+sg.Name = "PTH53" sg.ResetOnSpawn = false sg.DisplayOrder = 999
+
+local BG    = Color3.fromRGB(10,10,10)
+local SIDE  = Color3.fromRGB(8,8,8)
+local CARD  = Color3.fromRGB(18,18,18)
+local BORDER= Color3.fromRGB(35,35,35)
+local RED   = Color3.fromRGB(210,25,25)
+local WHITE = Color3.fromRGB(225,225,225)
+local MUTED = Color3.fromRGB(80,80,80)
+local DIM   = Color3.fromRGB(38,38,38)
+local GREEN = Color3.fromRGB(0,210,100)
+local GOLD  = Color3.fromRGB(243,156,18)
+local PINK  = Color3.fromRGB(255,150,200)
+
+local function twQ(o,t,p) TweenService:Create(o,TweenInfo.new(t,Enum.EasingStyle.Quart),p):Play() end
+local function twB(o,t,p) TweenService:Create(o,TweenInfo.new(t,Enum.EasingStyle.Back,Enum.EasingDirection.Out),p):Play() end
+
+-- ── SPLASH FRAME ──
+local Splash = Instance.new("Frame", sg)
+Splash.Size = UDim2.new(1,0,1,0)
+Splash.BackgroundColor3 = Color3.fromRGB(8,4,20)
+Splash.BorderSizePixel = 0 Splash.ZIndex = 100
+
+-- Тёмно-фиолетовый градиент
+local bgGrad = Instance.new("UIGradient", Splash)
+bgGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0,  Color3.fromRGB(15,5,35)),
+    ColorSequenceKeypoint.new(0.5,Color3.fromRGB(6,4,18)),
+    ColorSequenceKeypoint.new(1,  Color3.fromRGB(22,5,12)),
+})
+bgGrad.Rotation = 135
+
+-- ── ЗВЁЗДОЧКИ МЕРЦАЮТ ✦ ──
+for i = 1, 40 do
+    local star = Instance.new("TextLabel", Splash)
+    star.Size = UDim2.new(0,12,0,12)
+    star.Position = UDim2.new(math.random(1,99)/100,0,math.random(1,88)/100,0)
+    star.BackgroundTransparency = 1
+    star.Text = (i%4==0 and "✦" or i%4==1 and "✧" or i%4==2 and "★" or "·")
+    star.TextColor3 = Color3.fromRGB(200+math.random(0,55),200+math.random(0,55),255)
+    star.Font = Enum.Font.GothamBold
+    star.TextSize = math.random(8,16)
+    star.TextTransparency = math.random(40,75)/100
+    star.ZIndex = 101
+    task.spawn(function()
+        task.wait(math.random()*4)
+        while star and star.Parent do
+            TweenService:Create(star,TweenInfo.new(math.random(7,18)/10),{TextTransparency=math.random(5,25)/100}):Play()
+            task.wait(math.random(7,18)/10)
+            TweenService:Create(star,TweenInfo.new(math.random(7,18)/10),{TextTransparency=math.random(50,85)/100}):Play()
+            task.wait(math.random(7,18)/10)
+        end
+    end)
+end
+
+-- ── ТРАВА ВНИЗУ ──
+local grass = Instance.new("Frame", Splash)
+grass.Size = UDim2.new(1,0,0,70)
+grass.Position = UDim2.new(0,0,1,-70)
+grass.BackgroundColor3 = Color3.fromRGB(25,110,25)
+grass.BorderSizePixel = 0 grass.ZIndex = 102
+local grassGrad = Instance.new("UIGradient", grass)
+grassGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0,Color3.fromRGB(18,90,18)),
+    ColorSequenceKeypoint.new(1,Color3.fromRGB(45,160,45)),
+})
+grassGrad.Rotation = 90
+for i = 1, 25 do
+    local blade = Instance.new("TextLabel", grass)
+    blade.Size = UDim2.new(0,18,0,24)
+    blade.Position = UDim2.new(0,i*math.random(25,55),0,-14)
+    blade.BackgroundTransparency = 1
+    blade.Text = (i%3==0 and "🌿" or i%3==1 and "🍀" or "🌱")
+    blade.TextSize = 14 blade.ZIndex = 103
+end
+
+-- ── ОБЛАКА ПЛЫВУТ ──
+for i = 1, 4 do
+    local cloud = Instance.new("TextLabel", Splash)
+    cloud.Size = UDim2.new(0,70,0,30)
+    cloud.Position = UDim2.new(-0.15,0,0.03+i*0.055,0)
+    cloud.BackgroundTransparency = 1
+    cloud.Text = "☁"
+    cloud.TextColor3 = Color3.fromRGB(210,210,255)
+    cloud.Font = Enum.Font.GothamBold
+    cloud.TextSize = math.random(30,42)
+    cloud.TextTransparency = 0.22 cloud.ZIndex = 101
+    task.spawn(function()
+        task.wait(i*0.5)
+        TweenService:Create(cloud,TweenInfo.new(11+i*1.8,Enum.EasingStyle.Linear),{
+            Position=UDim2.new(1.15,0,cloud.Position.Y.Scale,0)
+        }):Play()
+    end)
+end
+
+-- ── ЦВЕТОЧКИ ПАДАЮТ 🌸🌺🌼 ──
+for i = 1, 16 do
+    local petal = Instance.new("TextLabel", Splash)
+    petal.Size = UDim2.new(0,24,0,24)
+    petal.Position = UDim2.new(math.random(3,97)/100,0,-0.06,0)
+    petal.BackgroundTransparency = 1
+    petal.Text = (i%3==0 and "🌸" or i%3==1 and "🌺" or "🌼")
+    petal.TextSize = math.random(16,26) petal.ZIndex = 105
+    task.spawn(function()
+        task.wait(math.random()*6)
+        TweenService:Create(petal,TweenInfo.new(5+math.random()*4,Enum.EasingStyle.Sine),{
+            Position=UDim2.new(petal.Position.X.Scale+(math.random()-0.5)*0.3,0,1.06,0),
+            TextTransparency=0.3,
+        }):Play()
+    end)
+end
+
+-- ══════════════════════════════════════════════
+--   ЖИВОТНЫЕ КРУПНЫЕ, БЕГУТ ВОЛНАМИ 🐱🐶🐰🦊🐻🐹🦋
+--   Волна 1: сразу  |  Волна 2: через 3 сек
+-- ══════════════════════════════════════════════
+local function spawnAnimalWave(waveDelay)
+    local wave = {
+        {emoji="🐱",delay=0.0, y=0.76,speed=3.0,size=52},
+        {emoji="🐶",delay=0.3, y=0.78,speed=3.3,size=48},
+        {emoji="🐰",delay=0.6, y=0.75,speed=2.8,size=46},
+        {emoji="🦊",delay=0.1, y=0.77,speed=3.5,size=50},
+        {emoji="🐻",delay=0.9, y=0.79,speed=2.6,size=56},
+        {emoji="🐹",delay=1.2, y=0.76,speed=3.6,size=42},
+        {emoji="🦋",delay=0.4, y=0.69,speed=4.0,size=38},
+    }
+    for _, a in ipairs(wave) do
+        task.spawn(function()
+            task.wait(waveDelay + a.delay)
+            local lbl = Instance.new("TextLabel", Splash)
+            lbl.Size = UDim2.new(0,a.size+12,0,a.size+12)
+            lbl.Position = UDim2.new(-0.14,0,a.y,0)
+            lbl.BackgroundTransparency = 1
+            lbl.Text = a.emoji
+            lbl.TextSize = a.size
+            lbl.ZIndex = 106
+
+            -- Бежит вправо
+            TweenService:Create(lbl,TweenInfo.new(a.speed,Enum.EasingStyle.Linear),{
+                Position=UDim2.new(1.1,0,a.y,0)
+            }):Play()
+
+            -- Прыжки волнами
+            task.spawn(function()
+                local steps = math.floor(a.speed / 0.3)
+                for j=1,steps do
+                    task.wait(0.3)
+                    if not lbl or not lbl.Parent then break end
+                    local curX = lbl.Position.X.Scale
+                    local curY = lbl.Position.Y.Scale
+                    -- Волнообразное движение вверх-вниз
+                    local jumpH = (j%2==0) and -0.04 or -0.02
+                    TweenService:Create(lbl,TweenInfo.new(0.13,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),
+                        {Position=UDim2.new(curX,0,curY+jumpH,0)}):Play()
+                    task.wait(0.13)
+                    if not lbl or not lbl.Parent then break end
+                    TweenService:Create(lbl,TweenInfo.new(0.13,Enum.EasingStyle.Quad,Enum.EasingDirection.In),
+                        {Position=UDim2.new(curX,0,a.y,0)}):Play()
+                end
+            end)
+        end)
+    end
+end
+
+-- Волна 1 — сразу
+spawnAnimalWave(0.5)
+-- Волна 2 — через 3.5 сек
+spawnAnimalWave(3.8)
+-- Волна 3 — через 7 сек (под конец заставки)
+spawnAnimalWave(7.2)
+
+-- ── МОНЕТКИ ЛЕТЯТ ВВЕРХ на 4-й сек 💰 ──
+task.spawn(function()
+    task.wait(4)
+    for i = 1, 12 do
+        task.wait(0.15)
+        local coin = Instance.new("TextLabel", Splash)
+        coin.Size = UDim2.new(0,28,0,28)
+        coin.Position = UDim2.new(math.random(15,85)/100,0,0.80,0)
+        coin.BackgroundTransparency = 1
+        coin.Text = "💰" coin.TextSize = 24 coin.ZIndex = 108
+        TweenService:Create(coin,TweenInfo.new(1.8,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{
+            Position=UDim2.new(coin.Position.X.Scale+(math.random()-0.5)*0.12,0,-0.1,0),
+            TextTransparency=1,
+            Size=UDim2.new(0,42,0,42),
+        }):Play()
+        task.delay(1.9,function() pcall(function() coin:Destroy() end) end)
+    end
+end)
+
+-- ── ЛОГОТИП PRIMEJTSU ──
+local CY = 0.18
+
+local glow = Instance.new("Frame", Splash)
+glow.Size = UDim2.new(0,280,0,100)
+glow.Position = UDim2.new(0.5,-140,CY-0.04,0)
+glow.BackgroundColor3 = Color3.fromRGB(80,10,10)
+glow.BackgroundTransparency = 0.88
+glow.BorderSizePixel = 0 glow.ZIndex = 104
+Instance.new("UICorner",glow).CornerRadius = UDim.new(0,50)
+
+-- Ᵽ красная
+local bigP = Instance.new("TextLabel", Splash)
+bigP.Size = UDim2.new(0,95,0,110)
+bigP.Position = UDim2.new(0.5,-180,CY,-55)
+bigP.BackgroundTransparency = 1
+bigP.Text = "Ᵽ"
+bigP.TextColor3 = RED bigP.Font = Enum.Font.GothamBlack
+bigP.TextSize = 95 bigP.TextTransparency = 1 bigP.ZIndex = 107
+bigP.TextStrokeTransparency = 0.2
+bigP.TextStrokeColor3 = Color3.fromRGB(255,80,80)
+
+-- RIMEJTSU по одной букве
+local nameLetters = {"R","I","M","E","J","T","S","U"}
+local nameLabels = {}
+for i, l in ipairs(nameLetters) do
+    local lb = Instance.new("TextLabel", Splash)
+    lb.Size = UDim2.new(0,32,0,110)
+    lb.Position = UDim2.new(0.5,-84+(i-1)*32,CY,-55)
+    lb.BackgroundTransparency = 1 lb.Text = l
+    lb.TextColor3 = WHITE lb.Font = Enum.Font.GothamBlack
+    lb.TextSize = 62 lb.TextTransparency = 1 lb.ZIndex = 107
+    table.insert(nameLabels,lb)
+end
+
+-- Подчёркивание
+local underline = Instance.new("Frame", Splash)
+underline.Size = UDim2.new(0,0,0,3)
+underline.Position = UDim2.new(0.5,0,CY+0.195,0)
+underline.BackgroundColor3 = RED underline.BorderSizePixel = 0 underline.ZIndex = 107
+local ulGrad = Instance.new("UIGradient", underline)
+ulGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0,Color3.fromRGB(255,80,80)),
+    ColorSequenceKeypoint.new(0.5,Color3.fromRGB(255,200,60)),
+    ColorSequenceKeypoint.new(1,Color3.fromRGB(255,80,80)),
+})
+
+-- by @Primejtsu
+local byLine = Instance.new("TextLabel", Splash)
+byLine.Size = UDim2.new(0,340,0,22)
+byLine.Position = UDim2.new(0.5,-170,CY+0.225,0)
+byLine.BackgroundTransparency = 1
+byLine.Text = "by  @Primejtsu  •  Murder Mystery 2  •  v5.3"
+byLine.TextColor3 = Color3.fromRGB(150,110,230)
+byLine.Font = Enum.Font.GothamBold
+byLine.TextSize = 12 byLine.TextTransparency = 1 byLine.ZIndex = 107
+
+-- Tagline
+local tagLine = Instance.new("TextLabel", Splash)
+tagLine.Size = UDim2.new(0,320,0,18)
+tagLine.Position = UDim2.new(0.5,-160,CY+0.265,0)
+tagLine.BackgroundTransparency = 1
+tagLine.Text = "🌸  Coin Farm  •  ESP  •  Speed  •  God  🌸"
+tagLine.TextColor3 = PINK tagLine.Font = Enum.Font.GothamBold
+tagLine.TextSize = 11 tagLine.TextTransparency = 1 tagLine.ZIndex = 107
+
+-- ── LOADING BAR ──
+local lbBG = Instance.new("Frame", Splash)
+lbBG.Size = UDim2.new(0,300,0,6)
+lbBG.Position = UDim2.new(0.5,-150,0.80,0)
+lbBG.BackgroundColor3 = Color3.fromRGB(22,12,40)
+lbBG.BorderSizePixel = 0 lbBG.ZIndex = 107
+Instance.new("UICorner",lbBG).CornerRadius = UDim.new(1,0)
+
+local lbFill = Instance.new("Frame", lbBG)
+lbFill.Size = UDim2.new(0,0,1,0)
+lbFill.BackgroundColor3 = PINK lbFill.BorderSizePixel = 0 lbFill.ZIndex = 108
+Instance.new("UICorner",lbFill).CornerRadius = UDim.new(1,0)
+local lbGrad = Instance.new("UIGradient", lbFill)
+lbGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0,Color3.fromRGB(255,120,210)),
+    ColorSequenceKeypoint.new(1,Color3.fromRGB(210,30,30)),
+})
+
+local loadTxt = Instance.new("TextLabel", Splash)
+loadTxt.Size = UDim2.new(0,300,0,17)
+loadTxt.Position = UDim2.new(0.5,-150,0.835,0)
+loadTxt.BackgroundTransparency = 1
+loadTxt.Text = "Primejtsu Hub загружается..."
+loadTxt.TextColor3 = MUTED loadTxt.Font = Enum.Font.Code
+loadTxt.TextSize = 11 loadTxt.TextTransparency = 1 loadTxt.ZIndex = 107
+
+local verTxt = Instance.new("TextLabel", Splash)
+verTxt.Size = UDim2.new(0,300,0,14)
+verTxt.Position = UDim2.new(0.5,-150,0.882,0)
+verTxt.BackgroundTransparency = 1
+verTxt.Text = "@Primejtsu  —  v5.3  •  Coins Fixed ✓"
+verTxt.TextColor3 = Color3.fromRGB(70,50,110) verTxt.Font = Enum.Font.Code
+verTxt.TextSize = 10 verTxt.TextTransparency = 1 verTxt.ZIndex = 107
+
+-- ════════════════════════════════════
+--   АНИМАЦИЯ ЗАСТАВКИ — 10 СЕКУНД
+-- ════════════════════════════════════
+task.spawn(function()
+    -- 0–0.5с: появление фона и свечения
+    task.wait(0.35)
+    twQ(glow,0.6,{BackgroundTransparency=0.70})
+    task.wait(0.25)
+
+    -- 0.6с: Ᵽ влетает
+    twB(bigP,0.6,{TextTransparency=0,Position=UDim2.new(0.5,-180,CY,-55)})
+    task.wait(0.15)
+
+    -- 0.75с: RIMEJTSU по одной
+    for i,lb in ipairs(nameLabels) do
+        task.wait(0.075)
+        lb.Position = UDim2.new(0.5,-84+(i-1)*32,CY-0.20,-55)
+        twB(lb,0.45,{TextTransparency=0,Position=UDim2.new(0.5,-84+(i-1)*32,CY,-55)})
+    end
+    task.wait(0.65)
+
+    -- 2.1с: подчёркивание
+    TweenService:Create(underline,TweenInfo.new(0.7,Enum.EasingStyle.Quart),{
+        Size=UDim2.new(0,380,0,3),
+        Position=UDim2.new(0.5,-190,CY+0.195,0),
+    }):Play()
+    task.wait(0.35)
+
+    -- 2.5с: подписи
+    twQ(byLine,0.5,{TextTransparency=0})
+    task.wait(0.25)
+    twQ(tagLine,0.45,{TextTransparency=0})
+
+    -- 3.0с: loading bar
+    task.wait(0.35)
+    twQ(loadTxt,0.3,{TextTransparency=0})
+    twQ(verTxt,0.3,{TextTransparency=0})
+
+    -- 3.3с–9.0с: 6 этапов загрузки (растянуты на ~5.7 сек)
+    local steps = {
+        {txt="🐱 Котик проверяет монеты...",       pct=0.15, wait=0.85},
+        {txt="🐶 Пёс загружает модули...",          pct=0.30, wait=0.90},
+        {txt="🐰 Зайка настраивает Coin Farm...",   pct=0.50, wait=0.95},
+        {txt="🦊 Лисичка включает ESP...",          pct=0.67, wait=0.90},
+        {txt="🐻 Медведь активирует God Mode...",   pct=0.84, wait=0.85},
+        {txt="✨ Primejtsu Hub готов! 🌸",          pct=1.00, wait=0.80},
+    }
+    for i,s in ipairs(steps) do
+        task.wait(s.wait)
+        loadTxt.Text = s.txt
+        TweenService:Create(lbFill,TweenInfo.new(0.5,Enum.EasingStyle.Quart),
+            {Size=UDim2.new(s.pct,0,1,0)}):Play()
+        if i==#steps then
+            task.wait(0.2)
+            loadTxt.TextColor3 = GREEN
+            TweenService:Create(lbFill,TweenInfo.new(0.35),{BackgroundColor3=GREEN}):Play()
+        end
+    end
+
+    -- 9.2с: сердечки 💖
+    task.wait(0.45)
+    for i = 1, 7 do
+        local heart = Instance.new("TextLabel", Splash)
+        heart.Size = UDim2.new(0,26,0,26)
+        heart.Position = UDim2.new(0.18+i*0.09,0,0.62,0)
+        heart.BackgroundTransparency = 1
+        heart.Text = "💖" heart.TextSize = 22 heart.ZIndex = 110
+        task.spawn(function()
+            task.wait(i*0.1)
+            TweenService:Create(heart,TweenInfo.new(0.75,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{
+                Position=UDim2.new(heart.Position.X.Scale+(math.random()-0.5)*0.14,0,0.12,0),
+                TextTransparency=1,
+                Size=UDim2.new(0,40,0,40),
+            }):Play()
+        end)
+    end
+
+    task.wait(1.0)
+
+    -- Финальное исчезновение
+    twQ(Splash,0.65,{BackgroundTransparency=1})
+    for _,o in ipairs(Splash:GetDescendants()) do
+        if o:IsA("TextLabel") then twQ(o,0.4,{TextTransparency=1})
+        elseif o:IsA("Frame") and o~=Splash then twQ(o,0.4,{BackgroundTransparency=1}) end
+    end
+    task.wait(0.8)
+    Splash:Destroy()
+    showGUI()
+
+    task.wait(0.4)
+    pcall(function()
+        game:GetService("StarterGui"):SetCore("SendNotification",{
+            Title="✅ Primejtsu Hub v5.3",
+            Text="Монеты мгновенно! 💰🌸 @Primejtsu",
+            Duration=5
+        })
+    end)
+end)
+
+-- ════════════════════════════════════════════════════════════════
+showGUI = function()
+
+local iconFrame=Instance.new("Frame",sg)
+iconFrame.Size=UDim2.new(0,46,0,46) iconFrame.Position=UDim2.new(1,-56,0.5,-23)
+iconFrame.BackgroundColor3=Color3.fromRGB(0,0,0) iconFrame.BorderSizePixel=0 iconFrame.ZIndex=50
+Instance.new("UICorner",iconFrame).CornerRadius=UDim.new(0,12)
+local iconBG=Instance.new("Frame",iconFrame) iconBG.Size=UDim2.new(1,0,1,0) iconBG.BackgroundColor3=RED iconBG.BorderSizePixel=0 iconBG.ZIndex=51
+Instance.new("UICorner",iconBG).CornerRadius=UDim.new(0,12)
+local iconBot=Instance.new("Frame",iconFrame) iconBot.Size=UDim2.new(1,0,0.35,0) iconBot.Position=UDim2.new(0,0,0.65,0) iconBot.BackgroundColor3=Color3.fromRGB(140,15,15) iconBot.BorderSizePixel=0 iconBot.ZIndex=52
+Instance.new("UICorner",iconBot).CornerRadius=UDim.new(0,12)
+local ibFix=Instance.new("Frame",iconBot) ibFix.Size=UDim2.new(1,0,0.5,0) ibFix.BackgroundColor3=Color3.fromRGB(140,15,15) ibFix.BorderSizePixel=0 ibFix.ZIndex=52
+local iconLetter=Instance.new("TextLabel",iconFrame) iconLetter.Size=UDim2.new(1,0,1,0) iconLetter.BackgroundTransparency=1 iconLetter.Text="Ᵽ" iconLetter.TextColor3=Color3.new(1,1,1) iconLetter.Font=Enum.Font.GothamBlack iconLetter.TextSize=26 iconLetter.ZIndex=53
+local dotIcon=Instance.new("Frame",iconFrame) dotIcon.Size=UDim2.new(0,10,0,10) dotIcon.Position=UDim2.new(1,-3,0,-3) dotIcon.BackgroundColor3=GREEN dotIcon.BorderSizePixel=0 dotIcon.ZIndex=54
+Instance.new("UICorner",dotIcon).CornerRadius=UDim.new(1,0) Instance.new("UIStroke",dotIcon).Color=Color3.fromRGB(0,0,0)
+task.spawn(function() while sg and sg.Parent do TweenService:Create(dotIcon,TweenInfo.new(0.8),{BackgroundTransparency=0.6}):Play() task.wait(0.8) TweenService:Create(dotIcon,TweenInfo.new(0.8),{BackgroundTransparency=0}):Play() task.wait(0.8) end end)
+
+local drag=false local dSt=nil local sSt=nil
+iconFrame.InputBegan:Connect(function(i)
+    if i.UserInputType==Enum.UserInputType.Touch or i.UserInputType==Enum.UserInputType.MouseButton1 then drag=true dSt=i.Position sSt=iconFrame.Position end
+end)
+iconFrame.InputEnded:Connect(function(i)
+    if i.UserInputType==Enum.UserInputType.Touch or i.UserInputType==Enum.UserInputType.MouseButton1 then drag=false end
+end)
+UIS.InputChanged:Connect(function(i)
+    if drag and (i.UserInputType==Enum.UserInputType.Touch or i.UserInputType==Enum.UserInputType.MouseMove) then
+        local d=i.Position-dSt iconFrame.Position=UDim2.new(sSt.X.Scale,sSt.X.Offset+d.X,sSt.Y.Scale,sSt.Y.Offset+d.Y)
+    end
+end)
+
+local W=Instance.new("Frame",sg)
+W.Size=UDim2.new(0,300,0,360) W.Position=UDim2.new(0.5,-150,0.5,-180)
+W.BackgroundColor3=BG W.BorderSizePixel=0 W.Active=true W.Draggable=true W.ClipsDescendants=true W.Visible=false
+Instance.new("UICorner",W).CornerRadius=UDim.new(0,8)
+Instance.new("UIStroke",W).Color=BORDER
+
+local guiOpen=false local tS2=Vector2.new(0,0) local tT2=0
+
+local function openGUI()
+    guiOpen=true W.Visible=true W.Size=UDim2.new(0,0,0,0) W.Position=UDim2.new(0.5,0,0.5,0)
+    TweenService:Create(W,TweenInfo.new(0.35,Enum.EasingStyle.Back,Enum.EasingDirection.Out),
+        {Size=UDim2.new(0,300,0,360),Position=UDim2.new(0.5,-150,0.5,-180)}):Play()
+    TweenService:Create(iconFrame,TweenInfo.new(0.2),{Size=UDim2.new(0,38,0,38)}):Play()
+end
+local function closeGUI()
+    guiOpen=false
+    TweenService:Create(W,TweenInfo.new(0.2,Enum.EasingStyle.Quart,Enum.EasingDirection.In),
+        {Size=UDim2.new(0,0,0,0),Position=UDim2.new(0.5,0,0.5,0)}):Play()
+    task.wait(0.25) W.Visible=false
+    TweenService:Create(iconFrame,TweenInfo.new(0.2),{Size=UDim2.new(0,46,0,46)}):Play()
+end
+
+iconFrame.InputBegan:Connect(function(i)
+    if i.UserInputType==Enum.UserInputType.Touch or i.UserInputType==Enum.UserInputType.MouseButton1 then tS2=Vector2.new(i.Position.X,i.Position.Y) tT2=tick() end
+end)
+iconFrame.InputEnded:Connect(function(i)
+    if i.UserInputType==Enum.UserInputType.Touch or i.UserInputType==Enum.UserInputType.MouseButton1 then
+        local dist=(Vector2.new(i.Position.X,i.Position.Y)-tS2).Magnitude
+        if dist<10 and tick()-tT2<0.4 then if guiOpen then closeGUI() else openGUI() end end
+    end
+end)
+
+-- HEADER
+local Hdr=Instance.new("Frame",W) Hdr.Size=UDim2.new(1,0,0,36) Hdr.BackgroundColor3=SIDE Hdr.BorderSizePixel=0
+Instance.new("UICorner",Hdr).CornerRadius=UDim.new(0,8)
+local hf=Instance.new("Frame",Hdr) hf.Size=UDim2.new(1,0,0.5,0) hf.Position=UDim2.new(0,0,0.5,0) hf.BackgroundColor3=SIDE hf.BorderSizePixel=0
+Instance.new("Frame",Hdr).Size=UDim2.new(1,0,0,2)
+local topLine=Instance.new("Frame",Hdr) topLine.Size=UDim2.new(1,0,0,2) topLine.BackgroundColor3=RED topLine.BorderSizePixel=0
+local lp2=Instance.new("TextLabel",Hdr) lp2.Size=UDim2.new(0,18,0,28) lp2.Position=UDim2.new(0,8,0.5,-14) lp2.BackgroundTransparency=1 lp2.Text="Ᵽ" lp2.TextColor3=RED lp2.Font=Enum.Font.GothamBlack lp2.TextSize=20
+local lr2=Instance.new("TextLabel",Hdr) lr2.Size=UDim2.new(0,80,0,28) lr2.Position=UDim2.new(0,24,0.5,-14) lr2.BackgroundTransparency=1 lr2.Text="RIMEJTSU" lr2.TextColor3=WHITE lr2.Font=Enum.Font.GothamBlack lr2.TextSize=14 lr2.TextXAlignment=Enum.TextXAlignment.Left
+local ls2=Instance.new("TextLabel",Hdr) ls2.Size=UDim2.new(0,165,0,12) ls2.Position=UDim2.new(0,8,1,-13) ls2.BackgroundTransparency=1 ls2.Text="MM2  •  v5.3  •  @Primejtsu 🌸" ls2.TextColor3=GREEN ls2.Font=Enum.Font.Code ls2.TextSize=8 ls2.TextXAlignment=Enum.TextXAlignment.Left
+local xBtn=Instance.new("TextButton",Hdr) xBtn.Size=UDim2.new(0,20,0,20) xBtn.Position=UDim2.new(1,-26,0.5,-10) xBtn.BackgroundColor3=RED xBtn.Text="✕" xBtn.TextColor3=WHITE xBtn.Font=Enum.Font.GothamBold xBtn.TextSize=9 xBtn.BorderSizePixel=0
+Instance.new("UICorner",xBtn).CornerRadius=UDim.new(0,5) xBtn.MouseButton1Click:Connect(closeGUI)
+
+-- BODY
+local Body=Instance.new("Frame",W) Body.Size=UDim2.new(1,0,1,-36) Body.Position=UDim2.new(0,0,0,36) Body.BackgroundTransparency=1
+local SB=Instance.new("Frame",Body) SB.Size=UDim2.new(0,75,1,0) SB.BackgroundColor3=SIDE SB.BorderSizePixel=0
+Instance.new("Frame",Body).Size=UDim2.new(0,1,1,0)
+local sdiv=Instance.new("Frame",Body) sdiv.Size=UDim2.new(0,1,1,0) sdiv.Position=UDim2.new(0,75,0,0) sdiv.BackgroundColor3=BORDER sdiv.BorderSizePixel=0
+local CT=Instance.new("ScrollingFrame",Body) CT.Size=UDim2.new(1,-76,1,0) CT.Position=UDim2.new(0,76,0,0) CT.BackgroundTransparency=1 CT.BorderSizePixel=0 CT.ScrollBarThickness=2 CT.ScrollBarImageColor3=RED CT.CanvasSize=UDim2.new(0,0,0,0)
+local CTL=Instance.new("UIListLayout",CT) CTL.Padding=UDim.new(0,4) CTL.SortOrder=Enum.SortOrder.LayoutOrder
+local CTP=Instance.new("UIPadding",CT) CTP.PaddingLeft=UDim.new(0,6) CTP.PaddingRight=UDim.new(0,6) CTP.PaddingTop=UDim.new(0,6) CTP.PaddingBottom=UDim.new(0,6)
+CTL:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() CT.CanvasSize=UDim2.new(0,0,0,CTL.AbsoluteContentSize.Y+12) end)
+
+local tabContent={} local tabBtns={} local TABS={"Info","Player","God","Farm","TP","Misc"}
+for _,n in ipairs(TABS) do tabContent[n]={} end
+local SBL=Instance.new("UIListLayout",SB) SBL.Padding=UDim.new(0,0) SBL.SortOrder=Enum.SortOrder.LayoutOrder
+Instance.new("UIPadding",SB).PaddingTop=UDim.new(0,4)
+
+local function makeSideBtn(label,icon)
+    local b=Instance.new("TextButton",SB) b.Size=UDim2.new(1,0,0,34) b.BackgroundTransparency=1 b.Text="" b.BorderSizePixel=0
+    local d=Instance.new("Frame",b) d.Size=UDim2.new(0,3,0,18) d.Position=UDim2.new(0,0,0.5,-9) d.BackgroundColor3=RED d.BorderSizePixel=0 d.Visible=false
+    Instance.new("UICorner",d).CornerRadius=UDim.new(1,0)
+    local il=Instance.new("TextLabel",b) il.Size=UDim2.new(0,16,1,0) il.Position=UDim2.new(0,10,0,0) il.BackgroundTransparency=1 il.Text=icon il.TextColor3=MUTED il.Font=Enum.Font.Gotham il.TextSize=12
+    local l=Instance.new("TextLabel",b) l.Size=UDim2.new(1,-28,1,0) l.Position=UDim2.new(0,28,0,0) l.BackgroundTransparency=1 l.Text=label l.TextColor3=MUTED l.Font=Enum.Font.GothamBold l.TextSize=10 l.TextXAlignment=Enum.TextXAlignment.Left
+    tabBtns[label]={btn=b,dot=d,lbl=l,ico=il} return b
+end
+
+local curFrames={}
+local function switchTab(name)
+    for _,f in ipairs(curFrames) do f.Parent=nil end curFrames={}
+    for k,t in pairs(tabBtns) do t.dot.Visible=false t.lbl.TextColor3=MUTED t.ico.TextColor3=MUTED end
+    if tabBtns[name] then tabBtns[name].dot.Visible=true tabBtns[name].lbl.TextColor3=WHITE tabBtns[name].ico.TextColor3=RED end
+    if tabContent[name] then for _,f in ipairs(tabContent[name]) do f.Parent=CT table.insert(curFrames,f) end end
+    task.wait() CT.CanvasSize=UDim2.new(0,0,0,CTL.AbsoluteContentSize.Y+12) CT.CanvasPosition=Vector2.new(0,0)
+end
+
+local tabIcons={Info="ℹ",Player="🏃",God="🛡",Farm="💰",TP="📍",Misc="⚙"}
+for _,n in ipairs(TABS) do
+    local b=makeSideBtn(n,tabIcons[n]) local nn=n
+    b.MouseButton1Click:Connect(function() switchTab(nn) end)
+end
+
+local function mkSec(tab,title)
+    local f=Instance.new("Frame") f.Size=UDim2.new(1,0,0,20) f.BackgroundTransparency=1 f.BorderSizePixel=0
+    local l=Instance.new("TextLabel",f) l.Size=UDim2.new(1,0,1,0) l.BackgroundTransparency=1 l.Text=title l.TextColor3=Color3.fromRGB(130,130,130) l.Font=Enum.Font.GothamBold l.TextSize=10 l.TextXAlignment=Enum.TextXAlignment.Left
+    local line=Instance.new("Frame",f) line.Size=UDim2.new(1,0,0,1) line.Position=UDim2.new(0,0,1,-1) line.BackgroundColor3=BORDER line.BorderSizePixel=0
+    table.insert(tabContent[tab],f)
+end
+
+local function mkToggle(tab,title,cfgKey,onFn)
+    local f=Instance.new("Frame") f.Size=UDim2.new(1,0,0,34) f.BackgroundColor3=CARD f.BorderSizePixel=0
+    Instance.new("UICorner",f).CornerRadius=UDim.new(0,6) Instance.new("UIStroke",f).Color=BORDER
+    local lbl=Instance.new("TextLabel",f) lbl.Size=UDim2.new(1,-52,1,0) lbl.Position=UDim2.new(0,10,0,0) lbl.BackgroundTransparency=1 lbl.Text=title lbl.TextColor3=WHITE lbl.Font=Enum.Font.Gotham lbl.TextSize=11 lbl.TextXAlignment=Enum.TextXAlignment.Left
+    local track=Instance.new("Frame",f) track.Size=UDim2.new(0,34,0,18) track.Position=UDim2.new(1,-42,0.5,-9) track.BackgroundColor3=DIM track.BorderSizePixel=0
+    Instance.new("UICorner",track).CornerRadius=UDim.new(1,0)
+    local circle=Instance.new("Frame",track) circle.Size=UDim2.new(0,13,0,13) circle.Position=UDim2.new(0,2,0.5,-6) circle.BackgroundColor3=MUTED circle.BorderSizePixel=0
+    Instance.new("UICorner",circle).CornerRadius=UDim.new(1,0)
+    local btn=Instance.new("TextButton",track) btn.Size=UDim2.new(1,0,1,0) btn.BackgroundTransparency=1 btn.Text=""
+    local on=false
+    btn.MouseButton1Click:Connect(function()
+        on=not on
+        local t2=TweenInfo.new(0.15)
+        if on then TweenService:Create(track,t2,{BackgroundColor3=RED}):Play() TweenService:Create(circle,t2,{Position=UDim2.new(0,19,0.5,-6),BackgroundColor3=WHITE}):Play()
+        else TweenService:Create(track,t2,{BackgroundColor3=DIM}):Play() TweenService:Create(circle,t2,{Position=UDim2.new(0,2,0.5,-6),BackgroundColor3=MUTED}):Play() end
+        if cfgKey then CFG[cfgKey]=on end
+        if onFn then onFn(on) end
+    end)
+    table.insert(tabContent[tab],f)
+end
+
+local function mkButton(tab,title,col,fn)
+    local bc=col or DIM
+    local f=Instance.new("Frame") f.Size=UDim2.new(1,0,0,30) f.BackgroundColor3=bc f.BorderSizePixel=0
+    Instance.new("UICorner",f).CornerRadius=UDim.new(0,6) Instance.new("UIStroke",f).Color=BORDER
+    local b=Instance.new("TextButton",f) b.Size=UDim2.new(1,0,1,0) b.BackgroundTransparency=1 b.Text=title b.TextColor3=WHITE b.Font=Enum.Font.GothamBold b.TextSize=11 b.BorderSizePixel=0
+    b.MouseButton1Click:Connect(function()
+        TweenService:Create(f,TweenInfo.new(0.1),{BackgroundColor3=RED}):Play()
+        task.wait(0.15) TweenService:Create(f,TweenInfo.new(0.1),{BackgroundColor3=bc}):Play()
+        if fn then fn() end
+    end)
+    table.insert(tabContent[tab],f)
+end
+
+-- ══ INFO TAB ══
+mkSec("Info","Информация")
+local ic=Instance.new("Frame") ic.Size=UDim2.new(1,0,0,80) ic.BackgroundColor3=CARD ic.BorderSizePixel=0
+Instance.new("UICorner",ic).CornerRadius=UDim.new(0,6) Instance.new("UIStroke",ic).Color=BORDER
+Instance.new("Frame",ic).Size=UDim2.new(1,0,0,2)
+local irt=Instance.new("Frame",ic) irt.Size=UDim2.new(1,0,0,2) irt.BackgroundColor3=RED irt.BorderSizePixel=0
+local _lp=Instance.new("TextLabel",ic) _lp.Size=UDim2.new(0,28,0,36) _lp.Position=UDim2.new(0,8,0.5,-18) _lp.BackgroundTransparency=1 _lp.Text="Ᵽ" _lp.TextColor3=RED _lp.Font=Enum.Font.GothamBlack _lp.TextSize=32
+local _n1=Instance.new("TextLabel",ic) _n1.Size=UDim2.new(1,-50,0,15) _n1.Position=UDim2.new(0,42,0,12) _n1.BackgroundTransparency=1 _n1.Text="Primejtsu Hub" _n1.TextColor3=WHITE _n1.Font=Enum.Font.GothamBlack _n1.TextSize=14 _n1.TextXAlignment=Enum.TextXAlignment.Left
+local _n2=Instance.new("TextLabel",ic) _n2.Size=UDim2.new(1,-50,0,12) _n2.Position=UDim2.new(0,42,0,28) _n2.BackgroundTransparency=1 _n2.Text="Script Developer" _n2.TextColor3=MUTED _n2.Font=Enum.Font.Code _n2.TextSize=10 _n2.TextXAlignment=Enum.TextXAlignment.Left
+local _n3=Instance.new("TextLabel",ic) _n3.Size=UDim2.new(1,-50,0,12) _n3.Position=UDim2.new(0,42,0,42) _n3.BackgroundTransparency=1 _n3.Text="✈ @Primejtsu" _n3.TextColor3=Color3.fromRGB(50,150,220) _n3.Font=Enum.Font.Code _n3.TextSize=10 _n3.TextXAlignment=Enum.TextXAlignment.Left
+local _n4=Instance.new("TextLabel",ic) _n4.Size=UDim2.new(1,0,0,12) _n4.Position=UDim2.new(0,8,1,-15) _n4.BackgroundTransparency=1 _n4.Text="v5.3  •  Монеты мгновенно!  •  @Primejtsu 🌸" _n4.TextColor3=GREEN _n4.Font=Enum.Font.Code _n4.TextSize=9 _n4.TextXAlignment=Enum.TextXAlignment.Left
+table.insert(tabContent["Info"],ic)
+
+local cd=Instance.new("Frame") cd.Size=UDim2.new(1,0,0,28) cd.BackgroundColor3=CARD cd.BorderSizePixel=0
+Instance.new("UICorner",cd).CornerRadius=UDim.new(0,6) Instance.new("UIStroke",cd).Color=BORDER
+local cdl=Instance.new("TextLabel",cd) cdl.Size=UDim2.new(0.55,0,1,0) cdl.Position=UDim2.new(0,10,0,0) cdl.BackgroundTransparency=1 cdl.Text="💰 Монет собрано" cdl.TextColor3=MUTED cdl.Font=Enum.Font.Gotham cdl.TextSize=11 cdl.TextXAlignment=Enum.TextXAlignment.Left
+local cdv=Instance.new("TextLabel",cd) cdv.Size=UDim2.new(0.4,0,1,0) cdv.Position=UDim2.new(0.58,0,0,0) cdv.BackgroundTransparency=1 cdv.Text="0" cdv.TextColor3=GOLD cdv.Font=Enum.Font.GothamBold cdv.TextSize=13 cdv.TextXAlignment=Enum.TextXAlignment.Right
+table.insert(tabContent["Info"],cd)
+RunService.Heartbeat:Connect(function() if cdv and cdv.Parent then cdv.Text=tostring(coinCount) end end)
+
+-- ══ PLAYER TAB ══
+mkSec("Player","Движение")
+mkToggle("Player","Speed Hack","speed")
+mkToggle("Player","Bunny Hop","bhop")
+mkToggle("Player","Noclip","noclip")
+
+-- ══ GOD TAB ══
+mkSec("God","Бессмертие + Скрытность")
+mkToggle("God","God Mode (Невидимость)","god",function(v) applyGod(v) end)
+mkToggle("God","ESP (роли игроков)","esp")
+mkToggle("God","Anti Knock",nil,function(v)
+    pcall(function()
+        local hrp=getHRP() if not hrp then return end
+        hrp.CustomPhysicalProperties=v and PhysicalProperties.new(0,0,0,0,0) or PhysicalProperties.new(0.7,0.3,0.5)
+    end)
+end)
+mkToggle("God","Inf Ammo (шериф)",nil,function(v)
+    pcall(function()
+        local c=getChar() if not c then return end
+        for _,t in ipairs(c:GetChildren()) do
+            if t:IsA("Tool") then local a=t:FindFirstChild("Ammo") if a then a.Value=v and 999 or a.Value end end
+        end
+    end)
+end)
+
+-- ══ FARM TAB ══
+mkSec("Farm","💰 Монеты мгновенно к тебе")
+mkToggle("Farm","Coin Farm 🪙 (авто, каждые 0.1с)","coinFarm")
+mkToggle("Farm","Bring Coins (ручной режим)","bringCoins")
+mkToggle("Farm","Knife Aura","knife")
+mkToggle("Farm","Auto Reward","autoReward")
+mkSec("Farm","АФК защита")
+mkToggle("Farm","Anti AFK","antiAfk")
+
+-- ══ TP TAB ══
+mkSec("TP","Быстрый TP")
+mkButton("TP","🔪  TP к Убийце",Color3.fromRGB(80,10,10),function()
+    pcall(function()
+        local hrp=getHRP() if not hrp then return end
+        for _,p in ipairs(Players:GetPlayers()) do
+            if p~=LP and getRole(p)=="Murderer" and p.Character then
+                local t=p.Character:FindFirstChild("HumanoidRootPart")
+                if t then hrp.CFrame=t.CFrame+Vector3.new(0,0,3) return end
+            end
+        end
+    end)
+end)
+mkButton("TP","🔫  TP к Шерифу",Color3.fromRGB(10,30,80),function()
+    pcall(function()
+        local hrp=getHRP() if not hrp then return end
+        for _,p in ipairs(Players:GetPlayers()) do
+            if p~=LP and getRole(p)=="Sheriff" and p.Character then
+                local t=p.Character:FindFirstChild("HumanoidRootPart")
+                if t then hrp.CFrame=t.CFrame+Vector3.new(0,0,3) return end
+            end
+        end
+    end)
+end)
+mkSec("TP","Список игроков")
+
+local playerListFrame=Instance.new("Frame")
+playerListFrame.Size=UDim2.new(1,0,0,10) playerListFrame.BackgroundTransparency=1 playerListFrame.BorderSizePixel=0
+playerListFrame.AutomaticSize=Enum.AutomaticSize.Y
+local pll=Instance.new("UIListLayout",playerListFrame) pll.Padding=UDim.new(0,3) pll.SortOrder=Enum.SortOrder.LayoutOrder
+table.insert(tabContent["TP"],playerListFrame)
+
+local function rebuildPlayerList()
+    for _,ch in ipairs(playerListFrame:GetChildren()) do
+        if ch:IsA("Frame") or ch:IsA("TextButton") then ch:Destroy() end
+    end
+    for _,p in ipairs(Players:GetPlayers()) do
+        if p==LP then continue end
+        local pf=Instance.new("Frame",playerListFrame)
+        pf.Size=UDim2.new(1,0,0,28) pf.BackgroundColor3=CARD pf.BorderSizePixel=0
+        Instance.new("UICorner",pf).CornerRadius=UDim.new(0,6) Instance.new("UIStroke",pf).Color=BORDER
+        local role=getRole(p) local col=ROLE_COLORS[role]
+        local accent=Instance.new("Frame",pf) accent.Size=UDim2.new(0,3,0.6,0) accent.Position=UDim2.new(0,0,0.2,0) accent.BackgroundColor3=col accent.BorderSizePixel=0
+        Instance.new("UICorner",accent).CornerRadius=UDim.new(1,0)
+        local name=Instance.new("TextLabel",pf) name.Size=UDim2.new(1,-60,1,0) name.Position=UDim2.new(0,12,0,0) name.BackgroundTransparency=1 name.Text=p.Name name.TextColor3=WHITE name.Font=Enum.Font.GothamBold name.TextSize=11 name.TextXAlignment=Enum.TextXAlignment.Left
+        local roleTag=Instance.new("TextLabel",pf) roleTag.Size=UDim2.new(0,50,1,0) roleTag.Position=UDim2.new(1,-52,0,0) roleTag.BackgroundTransparency=1
+        roleTag.Text=(role=="Murderer" and "🔪" or role=="Sheriff" and "🔫" or "😇")
+        roleTag.Font=Enum.Font.GothamBold roleTag.TextSize=14
+        local tpBtn=Instance.new("TextButton",pf) tpBtn.Size=UDim2.new(1,0,1,0) tpBtn.BackgroundTransparency=1 tpBtn.Text=""
+        tpBtn.MouseButton1Click:Connect(function()
+            pcall(function()
+                local hrp=getHRP() if not hrp then return end
+                if p.Character then
+                    local t=p.Character:FindFirstChild("HumanoidRootPart")
+                    if t then
+                        TweenService:Create(pf,TweenInfo.new(0.1),{BackgroundColor3=Color3.fromRGB(60,10,10)}):Play()
+                        task.wait(0.15)
+                        TweenService:Create(pf,TweenInfo.new(0.1),{BackgroundColor3=CARD}):Play()
+                        hrp.CFrame=t.CFrame+Vector3.new(0,0,3)
+                    end
+                end
+            end)
+        end)
+    end
+end
+
+task.spawn(function() while sg and sg.Parent do pcall(rebuildPlayerList) task.wait(3) end end)
+Players.PlayerAdded:Connect(function() task.wait(1) pcall(rebuildPlayerList) end)
+Players.PlayerRemoving:Connect(function() task.wait(0.5) pcall(rebuildPlayerList) end)
+
+-- ══ MISC TAB ══
+mkSec("Misc","Разное")
+mkToggle("Misc","Fullbright",nil,function(v) setFB(v) end)
+mkToggle("Misc","Hide Player",nil,function(v)
+    pcall(function()
+        local c=getChar() if not c then return end
+        for _,p in ipairs(c:GetDescendants()) do
+            if p:IsA("BasePart") or p:IsA("Decal") then p.LocalTransparencyModifier=v and 1 or 0 end
+        end
+    end)
+end)
+
+task.wait(0.15)
+switchTab("Info")
+
+end -- showGUI
+
+print("[Primejtsu Hub v5.3] @Primejtsu | Монеты мгновенно! | MM2 🌸")
