@@ -1,0 +1,26 @@
+{
+  "entity.titan.roar": {
+    "category": "hostile",
+    "sounds": ["mob.wither.spawn", "mob.wither.death", "mob.ghast.scream"],
+    "volume": 1.5,
+    "pitch": 0.6
+  },
+  "entity.titan.hurt": {
+    "category": "hostile",
+    "sounds": ["mob.wither.hurt", "mob.wither.ambient"],
+    "volume": 1.0,
+    "pitch": 0.8
+  },
+  "entity.titan.step": {
+    "category": "hostile",
+    "sounds": ["mob.slime.big"],
+    "volume": 0.8,
+    "pitch": 0.5
+  },
+  "entity.titan.attack": {
+    "category": "hostile",
+    "sounds": ["mob.wither.hurt"],
+    "volume": 1.2,
+    "pitch": 0.7
+  }
+}

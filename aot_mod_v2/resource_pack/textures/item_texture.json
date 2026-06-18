@@ -1,0 +1,11 @@
+{
+  "resource_pack_name": "AOT Resource Pack v2",
+  "texture_data": {
+    "titan_ring": {
+      "textures": ["textures/items/titan_ring"]
+    },
+    "titan_egg": {
+      "textures": ["textures/items/titan_egg"]
+    }
+  }
+}

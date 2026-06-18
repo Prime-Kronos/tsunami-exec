@@ -1,0 +1,22 @@
+{
+  "format_version": "1.21.0",
+  "minecraft:item": {
+    "description": {
+      "identifier": "aot:titan_transformation_ring",
+      "category": "equipment"
+    },
+    "components": {
+      "minecraft:icon": {
+        "texture": "titan_ring"
+      },
+      "minecraft:max_stack_size": 1,
+      "minecraft:use_duration": 32,
+      "minecraft:rarity": "epic",
+      "minecraft:hand_equipped": true,
+      "minecraft:foil": true,
+      "minecraft:enchantable": {
+        "value": 0
+      }
+    }
+  }
+}

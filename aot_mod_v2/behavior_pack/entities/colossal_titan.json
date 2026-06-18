@@ -1,0 +1,83 @@
+{
+  "format_version": "1.21.0",
+  "minecraft:entity": {
+    "description": {
+      "identifier": "aot:colossal_titan",
+      "is_spawnable": false,
+      "is_summonable": true,
+      "is_experimental": false
+    },
+    "components": {
+      "minecraft:type_family": {
+        "family": ["titan", "monster", "undead"]
+      },
+      "minecraft:health": {
+        "value": 600,
+        "max": 600
+      },
+      "minecraft:scale": {
+        "value": 5.0
+      },
+      "minecraft:movement.basic": {},
+      "minecraft:navigation.walk": {
+        "can_path_over_water": true,
+        "avoid_sun": false,
+        "avoid_damage_blocks": false
+      },
+      "minecraft:collision_box": {
+        "width": 3.0,
+        "height": 5.0
+      },
+      "minecraft:physics": {
+        "has_gravity": true,
+        "has_collision": true
+      },
+      "minecraft:knockback_resistance": {
+        "value": 0.9
+      },
+      "minecraft:attack": {
+        "damage": 30
+      },
+      "minecraft:behavior.nearest_attackable_target": {
+        "priority": 0,
+        "target_search_style": "nearest",
+        "attack_interval": 20,
+        "filters": {
+          "test": "is_family",
+          "subject": "other",
+          "value": "player"
+        }
+      },
+      "minecraft:behavior.melee_attack": {
+        "priority": 1,
+        "speed_multiplier": 1.0,
+        "track_target": true,
+        "attack_once": false
+      },
+      "minecraft:behavior.random_look_around": {
+        "priority": 3
+      },
+      "minecraft:behavior.wander": {
+        "priority": 4,
+        "speed_multiplier": 0.6
+      },
+      "minecraft:can_climb": {},
+      "minecraft:damage_sensor": {
+        "triggers": [
+          {
+            "on_damage": {
+              "event": "aot:titan_hurt"
+            },
+            "deals_damage": false
+          }
+        ]
+      },
+      "minecraft:nameable": {}
+    },
+    "events": {
+      "aot:titan_hurt": {
+        "sound": "mob.wither.hurt"
+      }
+    }
+  }
+}

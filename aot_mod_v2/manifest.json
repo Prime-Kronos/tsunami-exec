@@ -1,0 +1,24 @@
+{
+  "format_version": 2,
+  "header": {
+    "description": "Attack on Titan - Titan Transformation Addon v2.0",
+    "name": "AOT Titan Transformation v2",
+    "uuid": "12345678-abcd-ef01-2345-6789abcdef01",
+    "version": [2, 0, 0],
+    "min_engine_version": [1, 21, 0]
+  },
+  "modules": [
+    {
+      "description": "Behavior Module",
+      "type": "behaviors",
+      "uuid": "87654321-dcba-10fe-5432-ba9876543210",
+      "version": [2, 0, 0]
+    },
+    {
+      "description": "Resource Module",
+      "type": "resources",
+      "uuid": "11111111-2222-3333-4444-555555555555",
+      "version": [2, 0, 0]
+    }
+  ]
+}
