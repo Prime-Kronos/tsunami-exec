@@ -1,0 +1,18 @@
+{
+  "format_version": 2,
+  "header": {
+    "description": "Attack on Titan Behavior Pack",
+    "name": "AOT Behavior Pack",
+    "uuid": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+    "version": [1, 0, 0],
+    "min_engine_version": [1, 21, 0]
+  },
+  "modules": [
+    {
+      "description": "Behavior Module",
+      "type": "behaviors",
+      "uuid": "d4e5f6a7-b8c9-0123-def0-234567890123",
+      "version": [1, 0, 0]
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "entity.titan.roar": {
+    "category": "hostile",
+    "sounds": [
+      {
+        "name": "sounds/mob/titan/roar1",
+        "volume": 1.0,
+        "pitch": 1.0
+      },
+      {
+        "name": "sounds/mob/titan/roar2",
+        "volume": 1.0,
+        "pitch": 0.9
+      }
+    ]
+  },
+  "entity.titan.hurt": {
+    "category": "hostile",
+    "sounds": [
+      {
+        "name": "sounds/mob/titan/hurt1",
+        "volume": 0.8
+      },
+      {
+        "name": "sounds/mob/titan/hurt2",
+        "volume": 0.8
+      }
+    ]
+  },
+  "entity.titan.step": {
+    "category": "hostile",
+    "sounds": [
+      {
+        "name": "sounds/mob/titan/step",
+        "volume": 1.0
+      }
+    ]
+  }
+}

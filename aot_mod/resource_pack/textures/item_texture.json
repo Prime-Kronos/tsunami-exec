@@ -1,0 +1,10 @@
+{
+  "resource_pack_name": "AOT Textures",
+  "texture_data": {
+    "titan_ring": {
+      "textures": [
+        "textures/items/titan_ring"
+      ]
+    }
+  }
+}

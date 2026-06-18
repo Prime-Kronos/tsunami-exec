@@ -1,0 +1,58 @@
+{
+  "format_version": "1.21.0",
+  "animations": {
+    "animation.titan.idle": {
+      "loop": true,
+      "animation_length": 2,
+      "bones": {
+        "body": {
+          "position": {
+            "0.0": [0, 0, 0],
+            "1.0": [0, 0.1, 0],
+            "2.0": [0, 0, 0]
+          }
+        }
+      }
+    },
+    "animation.titan.walk": {
+      "loop": true,
+      "animation_length": 0.8,
+      "bones": {
+        "left_leg": {
+          "rotation": {
+            "0.0": [0, 0, 0],
+            "0.4": [25, 0, 0],
+            "0.8": [0, 0, 0]
+          }
+        },
+        "right_leg": {
+          "rotation": {
+            "0.0": [-25, 0, 0],
+            "0.4": [0, 0, 0],
+            "0.8": [-25, 0, 0]
+          }
+        }
+      }
+    },
+    "animation.titan.attack": {
+      "loop": false,
+      "animation_length": 1.2,
+      "bones": {
+        "left_arm": {
+          "rotation": {
+            "0.0": [0, 0, 0],
+            "0.6": [-120, 0, 0],
+            "1.2": [0, 0, 0]
+          }
+        },
+        "right_arm": {
+          "rotation": {
+            "0.0": [0, 0, 0],
+            "0.6": [-120, 0, 0],
+            "1.2": [0, 0, 0]
+          }
+        }
+      }
+    }
+  }
+}

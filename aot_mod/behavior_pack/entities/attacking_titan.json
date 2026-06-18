@@ -1,0 +1,120 @@
+{
+  "format_version": "1.21.0",
+  "minecraft:entity": {
+    "description": {
+      "identifier": "aot:attacking_titan",
+      "is_spawnable": false,
+      "is_summonable": true,
+      "is_experimental": false
+    },
+    "component_groups": {
+      "aot:titan_base": {
+        "minecraft:type_family": {
+          "family": ["titan", "monster"]
+        },
+        "minecraft:health": {
+          "value": 500,
+          "max": 500
+        },
+        "minecraft:scale": {
+          "value": 4.5
+        },
+        "minecraft:movement": {
+          "value": 0.35
+        },
+        "minecraft:nameable": {},
+        "minecraft:can_climb": {},
+        "minecraft:knockback_resistance": {
+          "value": 0.8
+        },
+        "minecraft:attack": {
+          "damage": 25
+        }
+      },
+      "aot:titan_animation": {
+        "minecraft:animation": {
+          "controllers": [
+            {
+              "controller": "controller.animation.titan_attack"
+            }
+          ]
+        }
+      },
+      "aot:titan_damage": {
+        "minecraft:damage_sensor": {
+          "triggers": [
+            {
+              "on_damage": {
+                "event": "aot:titan_hit"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "components": {
+      "minecraft:type_family": {
+        "family": ["titan", "monster"]
+      },
+      "minecraft:health": {
+        "value": 500,
+        "max": 500
+      },
+      "minecraft:scale": {
+        "value": 4.5
+      },
+      "minecraft:movement.basic": {},
+      "minecraft:navigation.walk": {
+        "can_path_over_water": true,
+        "avoid_sun": false
+      },
+      "minecraft:collision_box": {
+        "width": 2.5,
+        "height": 4.5
+      },
+      "minecraft:can_climb": {},
+      "minecraft:knockback_resistance": {
+        "value": 0.8
+      },
+      "minecraft:attack": {
+        "damage": 25
+      },
+      "minecraft:behavior.nearest_attackable_target": {
+        "priority": 0,
+        "target_search_style": "nearest",
+        "filters": {
+          "test": "is_family",
+          "subject": "other",
+          "value": "player"
+        }
+      },
+      "minecraft:behavior.melee_attack": {
+        "priority": 1,
+        "speed_multiplier": 1.2,
+        "track_target": true,
+        "attack_once": false
+      },
+      "minecraft:behavior.wander": {
+        "priority": 2,
+        "speed_multiplier": 0.8
+      },
+      "minecraft:loot": {
+        "table": "loot_tables/entities/titan_loot.json"
+      }
+    },
+    "events": {
+      "aot:titan_hit": {
+        "randomize": [
+          {
+            "weight": 1,
+            "sound": "mob.titan.hurt1"
+          },
+          {
+            "weight": 1,
+            "sound": "mob.titan.hurt2"
+          }
+        ]
+      }
+    }
+  }
+}
